@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -293,7 +292,7 @@ def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
 
 
 def _evaluate_nn_model(LB, FT, DG, train_sub, valid_sub, test_sub, model, num_tower, tower_type, num_epochs, decay,
-                      learning_rate, tower_size, verbose):
+                       learning_rate, tower_size, verbose):
     with tf.device("/cpu:0"):
         num_pts, num_labels, num_features, num_filt = LB.shape[0], LB.shape[1], FT.shape[1], len(DG)
 
@@ -369,7 +368,8 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, valid_sub, test_sub, model, num_to
             # Average over the 'tower' dimension
             grad = tf.reduce_mean(tf.concat(axis=0, values=gr), 0)
 
-            # Keep in mind that the Variables are redundant because they are shared across towers, so we just return the first tower's pointer to the Variable
+            # Keep in mind that the Variables are redundant because they are shared across towers,
+            # so we just return the first tower's pointer to the Variable
             grads.append((grad, grad_and_vars[0][1]))
 
         # Apply the gradients to adjust the shared variables
@@ -410,23 +410,26 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, valid_sub, test_sub, model, num_to
 
     # Create train, validation and test input dictionaries for Tensorflow
     feed_train, feed_valid, feed_test = dict(), dict(), dict()
-    feed_train[indxs], feed_valid[indxs], feed_test[indxs] = train_sub[:, np.newaxis], valid_sub[:,
-                                                                                       np.newaxis], test_sub[:,
-                                                                                                    np.newaxis]
+    feed_train[indxs] = train_sub[:, np.newaxis]
+    feed_valid[indxs] = valid_sub[:, np.newaxis]
+    feed_test[indxs] = test_sub[:, np.newaxis]
     feed_train[label], feed_valid[label], feed_test[label] = LB[train_sub, :], LB[valid_sub, :], LB[test_sub, :]
     feed_train[feats], feed_valid[feats], feed_test[feats] = FT[train_sub, :], FT[valid_sub, :], FT[test_sub, :]
     for dt in range(num_filt):
-        feed_train[diags[dt]], feed_valid[diags[dt]], feed_test[diags[dt]] = DG[dt][train_sub, :], DG[dt][valid_sub, :], \
-                                                                             DG[dt][test_sub, :]
+        feed_train[diags[dt]] = DG[dt][train_sub, :]
+        feed_valid[diags[dt]] = DG[dt][valid_sub, :]
+        feed_test[diags[dt]] = DG[dt][test_sub, :]
 
     # Create validation and test batches
     valid_batches = _create_batches(valid_sub, feed_valid, num_tower, tower_size, False)
-    test_batches  = _create_batches(test_sub, feed_test, num_tower, tower_size, False)
+    test_batches = _create_batches(test_sub, feed_test, num_tower, tower_size, False)
 
     # Build an initialization operation to run below
     init = tf.global_variables_initializer()
 
-    # Start running operations on the Graph. allow_soft_placement must be set to True to build towers on GPU, since some of the ops do not have GPU implementations.
+    # Start running operations on the Graph.
+    # allow_soft_placement must be set to True to build towers on GPU,
+    # since some of the ops do not have GPU implementations.
     # For GPU debugging, one may want to add in ConfigProto arguments: log_device_placement=True
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
@@ -467,7 +470,6 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, valid_sub, test_sub, model, num_to
     return list_train_accs, list_valid_accs, list_test_accs
 
 
-
 def visualization(dataset):
     path_dataset = "./data/" + dataset + "/"
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
@@ -476,24 +478,24 @@ def visualization(dataset):
     ilist = [0, 10, 20, 30, 40, 50]
     n, m = len(filts), len(ilist)
 
-    fig, axs = plt.subplots(n,m, figsize=(m*n / 2, n*m / 2))
+    fig, axs = plt.subplots(n, m, figsize=(m*n / 2, n*m / 2))
 
-    for (i,filtration) in enumerate(filts):
+    for (i, filtration) in enumerate(filts):
         for (j, idx) in enumerate(ilist):
-            xs, ys = diag[filtration][idx][:,0], diag[filtration][idx][:,1]
-            axs[i,j].scatter(xs,ys)
-            axs[i,j].axis([0,1,0,1])
-            axs[i,j].set_xticks([])
-            axs[i,j].set_yticks([])
+            xs, ys = diag[filtration][idx][:, 0], diag[filtration][idx][:, 1]
+            axs[i, j].scatter(xs, ys)
+            axs[i, j].axis([0, 1, 0, 1])
+            axs[i, j].set_xticks([])
+            axs[i, j].set_yticks([])
 
-    ### axis plot
+    # axis plot
     cols = ["idx = " + str(i) for i in ilist]
     rows = filts
 
     for ax, col in zip(axs[0], cols):
         ax.set_title(col)
 
-    for ax, row in zip(axs[:,0], rows):
+    for ax, row in zip(axs[:, 0], rows):
         ax.set_ylabel(row, rotation=90, size='large')
     plt.show()
     return
@@ -504,8 +506,10 @@ def _run_expe(dataset, model, num_run=1):
     # Train and test data
     # In this subsection, we finally train and test the network on the data.
     #
-    # Specify here how you want to train data and test data: either with K-folds ("KF") or with random permutations of test set ("RP").
+    # Specify here how you want to train data and test data: either with K-folds ("KF")
+    # or with random permutations of test set ("RP").
 
+    mode, num_folds, test_size = "RP", 100, 0.3
     if dataset_type == "graph":
         mode = "KF"  # Either "KF" or "RP"
         num_folds = 10  # Number of splits
@@ -515,14 +519,16 @@ def _run_expe(dataset, model, num_run=1):
         num_folds = 100  # Number of splits
         test_size = 0.3  # Size of test set in case of "RP"
 
-    # Specify here if you have one or several GPUs or CPUs, as well as number of epochs, batch size and validation size. If you do not want to use validation sets for early stopping, set valid_size to 0.
+    # Specify here if you have one or several GPUs or CPUs,
+    # as well as number of epochs, batch size and validation size.
+    # If you do not want to use validation sets for early stopping, set valid_size to 0.
     num_tower = 1  # Number of computing units
     tower_type = "gpu"  # Type of computing units ("cpu" or "gpu")
     batch_size = 128  # Batch size for each tower
     num_epochs = optim_parameters["num_epoch"]  # Number of epochs
     valid_size = 0.  # Size of validation set
-    opt_mode = "adam" # WARNING ! option not in use as of now
-    withdiag = True # use diagrams or not
+    opt_mode = "adam"  # WARNING ! option not in use as of now
+    withdiag = True  # use diagrams or not
 
     # Specify here the decay of Exponential Moving Average, the learning rate of optimizer and the verbose for training.
     decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
@@ -535,7 +541,7 @@ def _run_expe(dataset, model, num_run=1):
     num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
     diag = _diag_to_dict(diagfile, filts=filts)
-    # filts = diag.keys()
+    filts = diag.keys()
 
     # Extract and encode labels with integers
     L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
@@ -544,16 +550,19 @@ def _run_expe(dataset, model, num_run=1):
     # Extract features
     F = np.array(feat)[:, 1:]   # 1: removes the labels
 
-    diags = preprocess(diag)
+    diags = preprocess(diag, filts)
     # diags = D_pad
     feats = F
     labels = L
 
     instance_model = model
-        # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
+    # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
 
     # Train and test data.
-    train_accs_res, valid_accs_res, test_accs_res = np.zeros([num_run, num_folds, num_epochs]), np.zeros([num_run, num_folds, num_epochs]), np.zeros([num_run, num_folds, num_epochs])
+    train_accs_res = np.zeros([num_run, num_folds, num_epochs])
+    valid_accs_res = np.zeros([num_run, num_folds, num_epochs])
+    test_accs_res = np.zeros([num_run, num_folds, num_epochs])
+    folds = None
     for idx_score in range(num_run):
         print("Run number %i" % (idx_score+1))
         if mode == "KF":  # Evaluation with k-fold on test set
@@ -573,10 +582,12 @@ def _run_expe(dataset, model, num_run=1):
             tf.reset_default_graph()
 
             # Evaluation of neural network
-            ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub, \
-                                                       instance_model, num_tower, tower_type, num_epochs, \
+            ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+                                                       instance_model, num_tower, tower_type, num_epochs,
                                                        decay, learn_rate, batch_size, verbose)
-            train_accs_res[idx_score, idx, :], valid_accs_res[idx_score, idx, :], test_accs_res[idx_score, idx, :] = np.array(ltrain), np.array(lvalid), np.array(ltest)
+            train_accs_res[idx_score, idx, :] = np.array(ltrain)
+            valid_accs_res[idx_score, idx, :] = np.array(lvalid)
+            test_accs_res[idx_score, idx, :] = np.array(ltest)
 
     with open(path_dataset + "summary.txt", "w") as text_file:
         text_file.write(str(datetime.datetime.now()) + "\n\n")
@@ -618,6 +629,7 @@ def single_run(dataset, model):
     mode = "RP"  # Either "KF" or "RP"
     num_folds = 1  # Number of splits
     num_run = 1
+    test_size = 0.1
     if dataset_type == "graph":
         test_size = 0.1  # Size of test set
     elif dataset_type == "orbit":
@@ -642,14 +654,16 @@ def single_run(dataset, model):
     print("Learning rate:", optim_parameters["lr"])
     print("Decay:", optim_parameters["decay"])
     print("*"*20)
-    # Specify here if you have one or several GPUs or CPUs, as well as number of epochs, batch size and validation size. If you do not want to use validation sets for early stopping, set valid_size to 0.
+    # Specify here if you have one or several GPUs or CPUs,
+    # as well as number of epochs, batch size and validation size.
+    # If you do not want to use validation sets for early stopping, set valid_size to 0.
     num_tower = 1  # Number of computing units
     tower_type = "gpu"  # Type of computing units ("cpu" or "gpu")
     batch_size = 128  # Batch size for each tower
     num_epochs = optim_parameters["num_epoch"]  # Number of epochs
     valid_size = 0.  # Size of validation set
-    opt_mode = "adam" # WARNING ! option not in use as of now
-    withdiag = True # use diagrams or not
+    opt_mode = "adam"  # WARNING ! option not in use as of now
+    withdiag = True  # use diagrams or not
 
     # Specify here the decay of Exponential Moving Average, the learning rate of optimizer and the verbose for training.
     decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
@@ -662,7 +676,7 @@ def single_run(dataset, model):
     num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
     diag = _diag_to_dict(diagfile, filts=filts)
-    # filts = diag.keys()
+    filts = diag.keys()
 
     # Extract and encode labels with integers
     L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
@@ -671,14 +685,13 @@ def single_run(dataset, model):
     # Extract features
     F = np.array(feat)[:, 1:]   # 1: removes the labels
 
-    diags = preprocess(diag)
+    diags = preprocess(diag, filts)
     feats = F
     labels = L
 
-    instance_model = model #partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
+    instance_model = model  # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
 
     # Train and test data.
-    #train_accs_res, test_accs_res = np.zeros([num_epochs]), np.zeros([num_epochs])
     folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
 
     for idx, (train_sub, test_sub) in enumerate(folds):
@@ -691,10 +704,9 @@ def single_run(dataset, model):
         tf.reset_default_graph()
 
         # Evaluation of neural network
-        ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub, \
-                                                   instance_model, num_tower, tower_type, num_epochs, \
+        ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+                                                   instance_model, num_tower, tower_type, num_epochs,
                                                    decay, learn_rate, batch_size, verbose)
-        #train_accs_res[idx_score, idx, :], valid_accs_res[idx_score, idx, :], test_accs_res[idx_score, idx, :] = np.array(ltrain), np.array(lvalid), np.array(ltest)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot(np.array(ltrain), color="blue", label="train acc")
