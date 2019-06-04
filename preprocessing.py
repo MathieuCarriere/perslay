@@ -4,7 +4,7 @@ All rights reserved
 """
 
 import numpy as np
-from sklearn.base          import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
@@ -12,32 +12,34 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 # Preprocessing #############################
 #############################################
 
+
 class BirthPersistenceTransform(BaseEstimator, TransformerMixin):
 
     def __init__(self):
-        return None
+        #return None
+        pass
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
-        return np.matmul(X, np.array([[1., -1.],[0., 1.]]))
+        return np.matmul(X, np.array([[1., -1.], [0., 1.]]))
 
 
 class DiagramPreprocessor(BaseEstimator, TransformerMixin):
 
     def __init__(self, use=False, scalers=[]):
         self.scalers_ = scalers
-        self.use_     = use
+        self.use_ = use
 
     def fit(self, X, y=None):
         if self.use_:
             if len(X) == 1:
                 P = X[0]
             else:
-                P = np.concatenate(X,0)
+                P = np.concatenate(X, 0)
             for (indices, scaler) in self.scalers_:
-                scaler.fit(P[:,indices])
+                scaler.fit(P[:, indices])
         return self
 
     def transform(self, X):
@@ -46,8 +48,9 @@ class DiagramPreprocessor(BaseEstimator, TransformerMixin):
             for i in range(len(Xfit)):
                 if Xfit[i].shape[0] > 0:
                     for (indices, scaler) in self.scalers_:
-                        Xfit[i][:,indices] = scaler.transform(Xfit[i][:,indices])
+                        Xfit[i][:, indices] = scaler.transform(Xfit[i][:, indices])
         return Xfit
+
 
 class Padding(BaseEstimator, TransformerMixin):
 
@@ -64,20 +67,21 @@ class Padding(BaseEstimator, TransformerMixin):
             for diag in X:
                 [num_pts, dim] = diag.shape
                 diag_pad = np.zeros([max_card, dim+1])
-                diag_pad[:num_pts,:dim] = diag
+                diag_pad[:num_pts, :dim] = diag
                 diag_pad[:num_pts, dim] = np.ones(num_pts)
                 Xfit.append(diag_pad)                    
         else:
             Xfit = X
         return Xfit
 
+
 class ProminentPoints(BaseEstimator, TransformerMixin):
 
     def __init__(self, use=False, num_pts=10, threshold=-1, location="upper", point_type="finite"):
-        self.num_pts_    = num_pts
-        self.threshold_  = threshold
-        self.use_        = use
-        self.location_   = location
+        self.num_pts_ = num_pts
+        self.threshold_ = threshold
+        self.use_ = use
+        self.location_ = location
         self.point_type_ = point_type
 
     def fit(self, X, y=None):
@@ -90,26 +94,30 @@ class ProminentPoints(BaseEstimator, TransformerMixin):
                 diag = X[i]
                 if self.point_type_ == "finite":
                     if diag.shape[0] > 0:
-                        pers       = np.abs(np.matmul(diag[:,:2], [-1., 1.]))
+                        pers = np.abs(np.matmul(diag[:, :2], [-1., 1.]))
                         idx_thresh = pers >= self.threshold_
-                        thresh_diag, thresh_pers  = diag[idx_thresh.flatten()], pers[idx_thresh.flatten()]
-                        sort_index  = np.flip(np.argsort(thresh_pers, axis=None), 0)
+                        thresh_diag, thresh_pers = diag[idx_thresh.flatten()], pers[idx_thresh.flatten()]
+                        sort_index = np.flip(np.argsort(thresh_pers, axis=None), 0)
                         if self.location_ == "upper":
-                            new_diag = thresh_diag[sort_index[:min(self.num_pts_, thresh_diag.shape[0])],:]
+                            new_diag = thresh_diag[sort_index[:min(self.num_pts_, thresh_diag.shape[0])], :]
                         if self.location_ == "lower":
-                            new_diag = np.concatenate( [ thresh_diag[sort_index[min(self.num_pts_, thresh_diag.shape[0]):],:], diag[~idx_thresh.flatten()] ], axis=0)
+                            new_diag = np.concatenate([thresh_diag[sort_index[min(self.num_pts_,
+                                                                                  thresh_diag.shape[0]):], :],
+                                                       diag[~idx_thresh.flatten()]], axis=0)
                     else:
                         new_diag = diag
 
                 else:
                     if diag.shape[0] > 0:
-                        birth      = diag[:,:1]
+                        birth = diag[:, :1]
                         idx_thresh = birth >= self.threshold_
-                        thresh_diag, thresh_birth  = diag[idx_thresh.flatten()], birth[idx_thresh.flatten()]
+                        thresh_diag, thresh_birth = diag[idx_thresh.flatten()], birth[idx_thresh.flatten()]
                         if self.location_ == "upper":
-                            new_diag = thresh_diag[:min(self.num_pts_, thresh_diag.shape[0]),:]
+                            new_diag = thresh_diag[:min(self.num_pts_, thresh_diag.shape[0]), :]
                         if self.location_ == "lower":
-                            new_diag = np.concatenate( [ thresh_diag[min(self.num_pts_, thresh_diag.shape[0]):,:], diag[~idx_thresh.flatten()] ], axis=0)
+                            new_diag = np.concatenate([thresh_diag[min(self.num_pts_,
+                                                                       thresh_diag.shape[0]):, :],
+                                                       diag[~idx_thresh.flatten()]], axis=0)
                     else:
                         new_diag = diag
 
@@ -117,6 +125,7 @@ class ProminentPoints(BaseEstimator, TransformerMixin):
         else:
             Xfit = X
         return Xfit
+
 
 class DiagramSelector(BaseEstimator, TransformerMixin):
 
@@ -133,18 +142,18 @@ class DiagramSelector(BaseEstimator, TransformerMixin):
                 for i in range(num_diag):
                     diag = X[i]
                     if diag.shape[0] != 0:
-                        idx_fin = diag[:,1] != self.limit_
-                        Xfit.append(diag[idx_fin,:])
+                        idx_fin = diag[:, 1] != self.limit_
+                        Xfit.append(diag[idx_fin, :])
                     else:
                         Xfit.append(diag)
             if self.point_type_ == "essential":
                 for i in range(num_diag):
                     diag = X[i]
                     if diag.shape[0] != 0:
-                        idx_ess = diag[:,1] == self.limit_
-                        Xfit.append(np.delete(diag,1,1)[idx_ess,:])
+                        idx_ess = diag[:, 1] == self.limit_
+                        Xfit.append(np.delete(diag, 1, 1)[idx_ess, :])
                     else:
-                        Xfit.append(np.delete(diag,1,1))
+                        Xfit.append(np.delete(diag, 1, 1))
         else:
             Xfit = X
         return Xfit
@@ -166,14 +175,14 @@ class _nu_separator(BaseEstimator, TransformerMixin):
 
 
 def preprocess(diag, filts, thresh=200):
-    scaler = [([0,1],  Pipeline([("1", BirthPersistenceTransform()), ("2", MinMaxScaler()) ]))]
+    scaler = [([0, 1],  Pipeline([("1", BirthPersistenceTransform()), ("2", MinMaxScaler())]))]
 
     # Whole pipeline
-    preprocess = Pipeline([
+    tmp = Pipeline([
         ("Selector",      DiagramSelector(use=True, point_type="finite")),
         ("ProminentPts",  ProminentPoints(use=True, num_pts=400, point_type="finite")),
         ("Scaler",        DiagramPreprocessor(use=True,  scalers=scaler)),
-        ("NuSeparator",   DiagramPreprocessor(use=False, scalers=[([0,1],_nu_separator(nu=.1))])),
+        ("NuSeparator",   DiagramPreprocessor(use=False, scalers=[([0, 1], _nu_separator(nu=.1))])),
         ("Padding",       Padding(use=True)),
                           ])
     prm = {filt: {"ProminentPts__num_pts": min(thresh, max([len(dgm) for dgm in diag[filt]]))} for filt in filts if
@@ -182,13 +191,12 @@ def preprocess(diag, filts, thresh=200):
     D = []
     for dt in prm.keys():
         param = prm[dt]
-        preprocess.set_params(**param)
-        D.append(preprocess.fit_transform(diag[dt]))
+        tmp.set_params(**param)
+        D.append(tmp.fit_transform(diag[dt]))
 
     # For each filtration, concatenate all diagrams in a single array.
     D_pad = []
     for dt in range(len(prm.keys())):
         D_pad.append(np.concatenate([D[dt][i][np.newaxis, :] for i in range(len(D[dt]))], axis=0))
-        #print(D_pad[dt].shape)
 
     return D_pad
