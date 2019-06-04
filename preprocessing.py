@@ -174,7 +174,7 @@ class _nu_separator(BaseEstimator, TransformerMixin):
         return X
 
 
-def preprocess(diag, filts, thresh=200):
+def preprocess(diag, filts, thresh=500):
     scaler = [([0, 1],  Pipeline([("1", BirthPersistenceTransform()), ("2", MinMaxScaler())]))]
 
     # Whole pipeline
