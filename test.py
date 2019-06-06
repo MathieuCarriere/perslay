@@ -1,3 +1,7 @@
+"""Module :mod:`oerskay.archi` implement the persistence layer."""
+
+# Authors: Theo Lacombe <theo.lacombe@inria.fr>
+# License: MIT
 print("doing the imports...")
 from utils import generate, visualization, load
 from archi import perslay, baseModel

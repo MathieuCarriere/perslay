@@ -1,3 +1,9 @@
+"""Module :mod:`oerskay.expe` provide experimental functions to run perslay."""
+
+# Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
+#          Theo Lacombe <theo.lacombe@inria.fr>
+#          Martin Royer <martin.royer@inria.fr>
+# License: MIT
 import numpy as np
 import h5py
 import tensorflow as tf

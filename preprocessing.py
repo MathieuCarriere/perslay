@@ -1,7 +1,8 @@
-"""
-@author: Mathieu Carriere
-All rights reserved
-"""
+"""Module :mod:`oerskay.preprocessing` implement preprocessing for perslay compatibility."""
+
+# Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
+# License: MIT
+
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin

@@ -1,3 +1,9 @@
+"""Module :mod:`oerskay.archi` implement the persistence layer."""
+
+# Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
+#          Theo Lacombe <theo.lacombe@inria.fr>
+#          Martin Royer <martin.royer@inria.fr>
+# License: MIT
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
