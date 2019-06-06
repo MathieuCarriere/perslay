@@ -59,17 +59,21 @@ def perslay(output, name, diag,
                 else tf.get_variable("C", initializer=coeff_init)
             weight = C * tf.abs(tensor_diag[:, :, 1:2])
 
+    # TODO: Bug since recent update. To be corrected. For now only "linear" is available.
     if persistence_weight == "grid":
         with tf.variable_scope(name + "-grid_pweight"):
+
             W = tf.get_variable("W", shape=grid_size, initializer=grid_init) if not grid_const \
                 else tf.get_variable("W", initializer=grid_init)
             indices = []
-            for dim in range(dimension_diag - 1):
-                m, M = grid_bnds[dim]
-                coords = tf.slice(tensor_diag, [0, 0, dim], [-1, -1, 1])
-                ids = grid_size[dim] * (coords - m) / (M - m)
-                indices.append(tf.cast(ids, tf.int32))
-            weight = tf.expand_dims(tf.gather_nd(params=W, indices=tf.concat(indices, axis=2)), -1)
+            for dim in range(dimension_diag-1):
+                [m, M] = grid_bnds[dim]
+                print(tensor_diag)
+                coords = tf.slice(tensor_diag, [0,0,dim], [-1,-1,1])
+                ids = grid_size[dim] * (coords-m)/(M-m)
+                indices.append(tf.cast(ids,tf.int32))
+            weight = tf.expand_dims(tf.gather_nd(params=W, indices=tf.concat(indices, axis=2)),-1)
+
 
     # First layer of channel: processing of the persistence diagrams by vectorization of diagram points
     if layer == "pm":  # Channel with permutation equivariant layers
@@ -188,8 +192,8 @@ class baseModel:
                     layer=self.parameters["layer_type"],
                     perm_op=self.parameters["perm_op"],
                     keep=self.parameters["keep"],
-                    persistence_weight=self.parameters["weight"],
-                    grid_size=self.parameters["grid_size"],
+                    # persistence_weight=self.parameters["weight"],
+                    # grid_size=self.parameters["grid_size"],
                     image_size=self.parameters["image_size"],
                     num_gaussians=self.parameters["num_gaussians"],
                     num_samples=self.parameters["num_samples"],

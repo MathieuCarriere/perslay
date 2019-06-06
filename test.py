@@ -1,0 +1,39 @@
+print("doing the imports...")
+from utils import generate, visualization, load
+from archi import perslay, baseModel
+from preprocessing import preprocess
+from expe import single_run
+print("...imports done")
+
+dataset = "MUTAG"
+
+generate(dataset)
+
+feats, diags_tmp, filts, labels = load(dataset)
+
+diags = preprocess(diags_tmp, filts)
+
+layer_type = "im"
+
+perm_op = "sum"
+keep = 5  # only useful if perm_op = "topk"
+
+# Parameter specific to layer_type="im"
+image_size=[10, 10]
+# Parameter specific to layer_type="gs"
+num_gaussians=50
+# Parameter specific to layer_type="pm"
+d = 50  # Output dimension
+# Parameter specific to layer_type="ls"
+num_samples = 50
+
+perslayParameters = {"layer_type":layer_type,
+                     "perm_op": perm_op, "keep":keep,
+                    "image_size": image_size,
+                    "num_gaussians": num_gaussians,
+                    "pm_dimension": d,
+                    "num_samples": num_samples}
+
+model = baseModel(perslayParameters, filts, labels)
+
+single_run(dataset, model)
