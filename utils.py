@@ -92,7 +92,7 @@ def load(dataset, verbose=False):
         print("Number of observations:", L.shape[0])
         print("Number of classes:", L.shape[1])
 
-    return F, diag, filts, L
+    return diag, F, L
 
 def _hks_signature(eigenvectors, eigenvals, time):
     return np.square(eigenvectors).dot(np.diag(np.exp(-time * eigenvals))).sum(axis=1)
@@ -316,11 +316,13 @@ def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
     return batches
 
 
-def visualization(diag, filts, ilist=(0, 10, 20, 30, 40, 50)):
+def visualization(diag, ilist=(0, 10, 20, 30, 40, 50)):
     # path_dataset = "./data/" + dataset + "/"
     # diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
     # filts = list(diagfile.keys())
     # diag = _diag_to_dict(diagfile, filts=filts)
+
+    filts = diag.keys()
 
     n, m = len(filts), len(ilist)
 
