@@ -28,7 +28,7 @@ def perslay(output, name, diag,
             num_gaussians=150, num_samples=150,
             persistence_weight="linear",
             coeff_init=rui(1., 1.), coeff_const=False,
-            grid_size=[50, 50], grid_bnds=[[0., 1.], [0., 1.]], grid_init=rui(1.0, 1.0), grid_const=False,
+            grid_size=[50, 50], grid_bnds=[[-0.01, 1.01], [-0.01, 1.01]], grid_init=rui(1.0, 1.0), grid_const=False,
             image_size=[30, 30], image_bnds=[[0., 1.], [0., 1.]],
             weight_init=rui(0.0, 1.0), weight_const=False, bias_init=rui(0.0, 1.0), bias_const=False,
             mean_init=rui(0.0, 1.0), mean_const=False, variance_init=rui(3.0, 3.0), variance_const=False,
@@ -68,7 +68,6 @@ def perslay(output, name, diag,
             indices = []
             for dim in range(dimension_diag-1):
                 [m, M] = grid_bnds[dim]
-                print(tensor_diag)
                 coords = tf.slice(tensor_diag, [0,0,dim], [-1,-1,1])
                 ids = grid_size[dim] * (coords-m)/(M-m)
                 indices.append(tf.cast(ids,tf.int32))
@@ -181,6 +180,9 @@ class baseModel:
         self.parameters = parameters
         self.num_labels = labels.shape[1]
 
+    def get_parameters(self):
+        return self.parameters
+
     def instance(self, indxs, feats, diags):
         list_v = []
         for i in range(self.num_filts):
@@ -192,8 +194,8 @@ class baseModel:
                     layer=self.parameters["layer_type"],
                     perm_op=self.parameters["perm_op"],
                     keep=self.parameters["keep"],
-                    # persistence_weight=self.parameters["weight"],
-                    # grid_size=self.parameters["grid_size"],
+                    persistence_weight=self.parameters["weight"],
+                    grid_size=self.parameters["grid_size"],
                     image_size=self.parameters["image_size"],
                     num_gaussians=self.parameters["num_gaussians"],
                     num_samples=self.parameters["num_samples"],
