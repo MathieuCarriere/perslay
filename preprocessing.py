@@ -16,7 +16,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 class BirthPersistenceTransform(BaseEstimator, TransformerMixin):
 
     def __init__(self):
-        return None
+        pass
 
     def fit(self, X, y=None):
         return self
@@ -76,10 +76,10 @@ class Padding(BaseEstimator, TransformerMixin):
 class ProminentPoints(BaseEstimator, TransformerMixin):
 
     def __init__(self, use=False, num_pts=10, threshold=-1, location="upper", point_type="finite"):
-        self.num_pts    = num_pts
-        self.threshold  = threshold
-        self.use        = use
-        self.location   = location
+        self.num_pts = num_pts
+        self.threshold = threshold
+        self.use = use
+        self.location = location
         self.point_type = point_type
 
     def fit(self, X, y=None):

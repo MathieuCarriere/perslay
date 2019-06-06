@@ -73,11 +73,10 @@ def perslay(output, name, diag,
             indices = []
             for dim in range(dimension_diag-1):
                 [m, M] = grid_bnds[dim]
-                coords = tf.slice(tensor_diag, [0,0,dim], [-1,-1,1])
-                ids = grid_size[dim] * (coords-m)/(M-m)
-                indices.append(tf.cast(ids,tf.int32))
-            weight = tf.expand_dims(tf.gather_nd(params=W, indices=tf.concat(indices, axis=2)),-1)
-
+                coords = tf.slice(tensor_diag, [0, 0, dim], [-1, -1, 1])
+                ids = grid_size[dim] * (coords - m)/(M - m)
+                indices.append(tf.cast(ids, tf.int32))
+            weight = tf.expand_dims(tf.gather_nd(params=W, indices=tf.concat(indices, axis=2)), -1)
 
     # First layer of channel: processing of the persistence diagrams by vectorization of diagram points
     if layer == "pm":  # Channel with permutation equivariant layers
@@ -188,7 +187,7 @@ class baseModel:
     def get_parameters(self):
         return self.parameters
 
-    def instance(self, indxs, feats, diags):
+    def instance(self, feats, diags):
         list_v = []
         for i in range(self.num_filts):
             # A perslay channel must be defined for each type of diagram

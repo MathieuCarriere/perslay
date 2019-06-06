@@ -39,8 +39,8 @@ def _evaluate_nn_model(LB, FT, DG,
 
         # Optimizer
         gs = tf.Variable(0, trainable=False)
-        lr = tf.train.exponential_decay(learning_rate=learning_rate, global_step=gs, decay_steps=20, decay_rate=.5,
-                                        staircase=True)
+        # lr = tf.train.exponential_decay(learning_rate=learning_rate, global_step=gs, decay_steps=20, decay_rate=.5,
+        #                                staircase=True)
 
         # opt = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
         opt = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-4)
@@ -58,13 +58,13 @@ def _evaluate_nn_model(LB, FT, DG,
             accuracy = 0
             for i in xrange(num_tower):
                 with tf.device("/" + tower_type + ":" + str(i)):
-                    with tf.name_scope("tower_" + str(i)) as scope:
+                    with tf.name_scope("tower_" + str(i)):  # as scope:
                         # Get split corresponding to tower
                         tow_indxs, tow_label, tow_feats, tow_diags = sp_indxs[i], sp_label[i], sp_feats[i], [
                             sp_diags[dt][i] for dt in range(num_filt)]
 
                         # Apply model
-                        tow_logit = model.instance(tow_indxs, tow_feats, tow_diags)
+                        tow_logit = model.instance(tow_feats, tow_diags)
 
                         # Compute train loss and accuracy on this tower
                         tow_acc = tf.reduce_mean(
@@ -235,7 +235,7 @@ def _run_expe(dataset, model, num_run=1):
     path_dataset = "./data/" + dataset + "/"
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
     filts = list(diagfile.keys())
-    num_filts = len(filts)
+    # num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
     diag = _diag_to_dict(diagfile, filts=filts)
     filts = diag.keys()
@@ -323,16 +323,17 @@ def _run_expe(dataset, model, num_run=1):
 def single_reproduce(dataset, model):
     dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
     # Train and test data
-    mode = "RP"  # Either "KF" or "RP"
+    # mode = "RP"  # Either "KF" or "RP"
     num_folds = 1  # Number of splits
-    num_run = 1
+    # num_run = 1
     test_size = 0.1
     if dataset_type == "graph":
         test_size = 0.1  # Size of test set
     elif dataset_type == "orbit":
         test_size = 0.3  # Size of test set
 
-    print("Doing a Single Run on the dataset: " + dataset + " with a " + str(int(100 * (1-test_size))) + "-" + str(int(100 * test_size))+" split.")
+    print("Doing a Single Run on the dataset: " + dataset + " with a "
+          + str(int(100 * (1-test_size))) + "-" + str(int(100 * test_size))+" split.")
 
     print("Filtrations used:")
     print(list_filtrations)
@@ -340,9 +341,9 @@ def single_reproduce(dataset, model):
     print(" ***** PersLay parameters: *****")
     layer_type = perslay_parameters["layer"]
     print("Layer type:", layer_type)
-    if layer_type=="im":
+    if layer_type == "im":
         print("image size:", perslay_parameters["image_size"])
-    elif layer_type=="pm":
+    elif layer_type == "pm":
         print("peq:", perslay_parameters["peq"])
     print("grid size:", perslay_parameters["grid_size"])
     print("***** Optimization parameters *****")
@@ -359,8 +360,8 @@ def single_reproduce(dataset, model):
     batch_size = 128  # Batch size for each tower
     num_epochs = optim_parameters["num_epoch"]  # Number of epochs
     valid_size = 0.  # Size of validation set
-    opt_mode = "adam"  # WARNING ! option not in use as of now
-    withdiag = True  # use diagrams or not
+    # opt_mode = "adam"  # WARNING ! option not in use as of now
+    # withdiag = True  # use diagrams or not
 
     # Specify here the decay of Exponential Moving Average, the learning rate of optimizer and the verbose for training.
     decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
@@ -370,10 +371,10 @@ def single_reproduce(dataset, model):
     path_dataset = "./data/" + dataset + "/"
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
     filts = list(diagfile.keys())
-    num_filts = len(filts)
+    # num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
     diag = _diag_to_dict(diagfile, filts=filts)
-    filts = diag.keys()
+    # filts = diag.keys()
 
     # Extract and encode labels with integers
     L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
@@ -385,8 +386,6 @@ def single_reproduce(dataset, model):
     diags = preprocess(diag)
     feats = F
     labels = L
-
-    instance_model = model  # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
 
     # Train and test data.
     folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
@@ -402,7 +401,7 @@ def single_reproduce(dataset, model):
 
         # Evaluation of neural network
         ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
-                                                   instance_model, num_tower, tower_type, num_epochs,
+                                                   model, num_tower, tower_type, num_epochs,
                                                    decay, learn_rate, batch_size, verbose)
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -433,9 +432,9 @@ def single_run(diags, feats, labels,
     print(" ***** PersLay parameters: *****")
     layer_type = perslay_parameters["layer_type"]
     print("Layer type:", layer_type)
-    if layer_type=="im":
+    if layer_type == "im":
         print("image size:", perslay_parameters["image_size"])
-    elif layer_type=="pm":
+    elif layer_type == "pm":
         print("pm_dimension:", perslay_parameters["pm_dimension"])
     if perslay_parameters["weight"] == "grid":
         print("grid size:", perslay_parameters["grid_size"])
@@ -458,8 +457,6 @@ def single_run(diags, feats, labels,
     decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
     learn_rate = optim_parameters["lr"]  # Learning rate of optimizer
 
-    instance_model = model  # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
-
     # Train and test data.
     folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
 
@@ -474,7 +471,7 @@ def single_run(diags, feats, labels,
 
         # Evaluation of neural network
         ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
-                                                   instance_model, num_tower, tower_type, num_epochs,
+                                                   model, num_tower, tower_type, num_epochs,
                                                    decay, learn_rate, batch_size, verbose=True)
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -487,8 +484,6 @@ def single_run(diags, feats, labels,
         ax.set_title("Evolution of train/test accuracy")
         plt.show()
     return
-
-
 
 
 def perform_expe(dataset, model):

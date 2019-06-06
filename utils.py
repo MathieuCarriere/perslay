@@ -12,7 +12,6 @@ import os.path
 
 
 from ast import literal_eval
-from collections import defaultdict
 import itertools
 
 import numpy as np
@@ -27,9 +26,6 @@ from scipy.sparse import csgraph
 from scipy.io import loadmat, savemat
 from scipy.linalg import eigh
 import pandas as pd
-
-
-import tensorflow as tf
 
 import gudhi as gd
 
@@ -47,7 +43,7 @@ def _get_base_simplex(A):
 
 
 # Input utility functions for persistence diagrams
-def _diag_to_dict(diag_file, filts=[]):
+def _diag_to_dict(diag_file, filts):
     out_dict = dict()
     if len(filts) == 0:
         filts = diag_file.keys()
@@ -73,7 +69,7 @@ def _load_config(dataset):
 
 
 def load(dataset, verbose=False):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
     path_dataset = "./data/" + dataset + "/"
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
     filts = list(diagfile.keys())
@@ -93,6 +89,7 @@ def load(dataset, verbose=False):
         print("Number of classes:", L.shape[1])
 
     return diag, F, L
+
 
 def _hks_signature(eigenvectors, eigenvals, time):
     return np.square(eigenvectors).dot(np.diag(np.exp(-time * eigenvals))).sum(axis=1)
@@ -215,7 +212,6 @@ def generate(dataset):
         for graph_name in os.listdir(path_dataset + "mat/"):
             A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
             pad_size = np.max((A.shape[0], pad_size))
-        # print("This dataset has eigenvector padding", pad_size)
 
         features = pd.DataFrame(index=range(len(os.listdir(path_dataset + "mat/"))),
                                 columns=["label"] +
@@ -279,8 +275,10 @@ def generate(dataset):
                 alpha_complex = gd.AlphaComplex(points=X)
                 simplex_tree = alpha_complex.create_simplex_tree(max_alpha_square=1e50)
                 simplex_tree.persistence()
-                diag_file["Alpha0"].create_dataset(name=str(count), data=np.array(simplex_tree.persistence_intervals_in_dimension(0)))
-                diag_file["Alpha1"].create_dataset(name=str(count), data=np.array(simplex_tree.persistence_intervals_in_dimension(1)))
+                diag_file["Alpha0"].create_dataset(name=str(count),
+                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(0)))
+                diag_file["Alpha1"].create_dataset(name=str(count),
+                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(1)))
                 orbit_label = {"label": lab, "pcid": count}
                 labs.append(orbit_label)
                 count += 1
@@ -298,7 +296,7 @@ def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
     residual = data_num_pts % batch_size
     nbsplit = int((data_num_pts - residual) / batch_size)
     split = np.split(np.arange(data_num_pts - residual), nbsplit) if nbsplit > 0 else []
-    number_of_batches = nbsplit + min(residual, 1)
+    # number_of_batches = nbsplit + min(residual, 1)
     if random:
         perm = np.random.permutation(data_num_pts)
     batches = []
@@ -347,5 +345,3 @@ def visualization(diag, ilist=(0, 10, 20, 30, 40, 50)):
         ax.set_ylabel(row, rotation=90, size='large')
     plt.show()
     return
-
-
