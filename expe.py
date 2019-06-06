@@ -20,7 +20,7 @@ def _evaluate_nn_model(LB, FT, DG,
                        model,
                        num_tower, tower_type,
                        num_epochs, decay, learning_rate, tower_size,
-                       verbose):
+                       verbose=True):
     with tf.device("/cpu:0"):
         num_pts, num_labels, num_features, num_filt = LB.shape[0], LB.shape[1], FT.shape[1], len(DG)
 
@@ -314,7 +314,7 @@ def _run_expe(dataset, model, num_run=1):
     return
 
 
-def single_run(dataset, model):
+def single_reproduce(dataset, model):
     dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
     # Train and test data
     mode = "RP"  # Either "KF" or "RP"
@@ -409,6 +409,77 @@ def single_run(dataset, model):
         ax.set_title("Evolution of train/test accuracy for " + dataset)
         plt.show()
     return
+
+
+def single_run(diags, feats, labels, list_filtrations, model,
+               optim_parameters, test_size=0.1, thresh=500):
+    # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    num_folds = 1  # Number of splits
+
+    perslay_parameters = model.get_parameters()
+
+    print("Filtrations used:")
+    print(list_filtrations)
+    print("Thresholding in diagrams:", thresh)
+    print(" ***** PersLay parameters: *****")
+    layer_type = perslay_parameters["layer_type"]
+    print("Layer type:", layer_type)
+    if layer_type=="im":
+        print("image size:", perslay_parameters["image_size"])
+    elif layer_type=="pm":
+        print("peq:", perslay_parameters["peq"])
+    if perslay_parameters["weight"] == "grid":
+        print("grid size:", perslay_parameters["grid_size"])
+    print("***** Optimization parameters *****")
+    print("Optimizer:", "adam")
+    print("Number of epochs:", optim_parameters["num_epoch"])
+    print("Learning rate:", optim_parameters["lr"])
+    print("Decay:", optim_parameters["decay"])
+    print("*"*20)
+    # Specify here if you have one or several GPUs or CPUs,
+    # as well as number of epochs, batch size and validation size.
+    # If you do not want to use validation sets for early stopping, set valid_size to 0.
+    num_tower = 1  # Number of computing units
+    tower_type = "gpu"  # Type of computing units ("cpu" or "gpu")
+    batch_size = 128  # Batch size for each tower
+    num_epochs = optim_parameters["num_epoch"]  # Number of epochs
+    valid_size = 0.  # Size of validation set
+
+    # Specify here the decay of Exponential Moving Average, the learning rate of optimizer and the verbose for training.
+    decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
+    learn_rate = optim_parameters["lr"]  # Learning rate of optimizer
+
+    instance_model = model  # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
+
+    # Train and test data.
+    folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
+
+    for idx, (train_sub, test_sub) in enumerate(folds):
+        valid_sub = train_sub[:int(valid_size * len(train_sub))]
+        train_sub = train_sub[int(valid_size * len(train_sub)):]
+
+        print(str(len(train_sub)) + " train points and " + str(len(test_sub)) + " test points")
+
+        # Create neural network
+        tf.reset_default_graph()
+
+        # Evaluation of neural network
+        ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+                                                   instance_model, num_tower, tower_type, num_epochs,
+                                                   decay, learn_rate, batch_size, verbose=True)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(np.array(ltrain), color="blue", label="train acc")
+        ax.plot(np.array(ltest), color="red", label="test acc")
+        ax.set_ylim(top=100)
+        ax.legend()
+        ax.set_xlabel("epochs")
+        ax.set_ylabel("classif. accuracy")
+        ax.set_title("Evolution of train/test accuracy")
+        plt.show()
+    return
+
+
 
 
 def perform_expe(dataset, model):
