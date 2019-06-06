@@ -15,7 +15,7 @@ generate(dataset)
 
 feats, diags_tmp, filts, labels = load(dataset)
 
-diags = preprocess(diags_tmp, filts)
+diags = preprocess(diags_tmp)
 
 layer_type = "im"
 

@@ -247,7 +247,7 @@ def _run_expe(dataset, model, num_run=1):
     # Extract features
     F = np.array(feat)[:, 1:]   # 1: removes the labels
 
-    diags = preprocess(diag, filts)
+    diags = preprocess(diag)
     # diags = D_pad
     feats = F
     labels = L
@@ -382,7 +382,7 @@ def single_reproduce(dataset, model):
     # Extract features
     F = np.array(feat)[:, 1:]   # 1: removes the labels
 
-    diags = preprocess(diag, filts)
+    diags = preprocess(diag)
     feats = F
     labels = L
 
@@ -417,8 +417,11 @@ def single_reproduce(dataset, model):
     return
 
 
-def single_run(diags, feats, labels, list_filtrations, model,
-               optim_parameters, test_size=0.1, thresh=500):
+def single_run(diags, feats, labels,
+               list_filtrations, model,
+               optim_parameters,
+               test_size,
+               thresh=500):
     # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
     num_folds = 1  # Number of splits
 
