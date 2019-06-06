@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.expe` provide experimental functions to run perslay."""
+"""Module :mod:`perskay.expe` provide experimental functions to run perslay."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 #          Theo Lacombe <theo.lacombe@inria.fr>
@@ -436,7 +436,7 @@ def single_run(diags, feats, labels,
     if layer_type=="im":
         print("image size:", perslay_parameters["image_size"])
     elif layer_type=="pm":
-        print("peq:", perslay_parameters["peq"])
+        print("pm_dimension:", perslay_parameters["pm_dimension"])
     if perslay_parameters["weight"] == "grid":
         print("grid size:", perslay_parameters["grid_size"])
     print("***** Optimization parameters *****")

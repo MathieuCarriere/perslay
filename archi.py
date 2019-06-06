@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.archi` implement the persistence layer."""
+"""Module :mod:`perskay.archi` implement the persistence layer."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 #          Theo Lacombe <theo.lacombe@inria.fr>
@@ -29,13 +29,13 @@ def _post_processing(vector, pro, dropout_value=.9):
 
 # PersLay channel for persistence diagrams
 def perslay(output, name, diag,
-            layer="pm", perm_op="sum", fc_layers=[], cv_layers=[],
-            peq=[(50, None)], keep=50,
+            layer="pm", perm_op="sum", fc_layers=(), cv_layers=(),
+            peq=(50, None), keep=50,
             num_gaussians=150, num_samples=150,
             persistence_weight="linear",
             coeff_init=rui(1., 1.), coeff_const=False,
-            grid_size=[50, 50], grid_bnds=[[-0.01, 1.01], [-0.01, 1.01]], grid_init=rui(1.0, 1.0), grid_const=False,
-            image_size=[30, 30], image_bnds=[[0., 1.], [0., 1.]],
+            grid_size=(50, 50), grid_bnds=((-0.01, 1.01), (-0.01, 1.01)), grid_init=rui(1.0, 1.0), grid_const=False,
+            image_size=(30, 30), image_bnds=((0., 1.), (0., 1.)),
             weight_init=rui(0.0, 1.0), weight_const=False, bias_init=rui(0.0, 1.0), bias_const=False,
             mean_init=rui(0.0, 1.0), mean_const=False, variance_init=rui(3.0, 3.0), variance_const=False,
             sample_init=rui(0.0, 1.0), sample_const=False,
@@ -65,7 +65,6 @@ def perslay(output, name, diag,
                 else tf.get_variable("C", initializer=coeff_init)
             weight = C * tf.abs(tensor_diag[:, :, 1:2])
 
-    # TODO: Bug since recent update. To be corrected. For now only "linear" is available.
     if persistence_weight == "grid":
         with tf.variable_scope(name + "-grid_pweight"):
 

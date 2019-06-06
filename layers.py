@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.archi` implement the persistence layer."""
+"""Module :mod:`perskay.archi` implement the persistence layer."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 # License: MIT

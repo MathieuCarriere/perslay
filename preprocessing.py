@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.preprocessing` implement preprocessing for perslay compatibility."""
+"""Module :mod:`perskay.preprocessing` implement preprocessing for perslay compatibility."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 # License: MIT

@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.archi` implement the persistence layer."""
+"""Module :mod:`perslay.test` Test script."""
 
 # Authors: Theo Lacombe <theo.lacombe@inria.fr>
 # License: MIT
@@ -13,9 +13,8 @@ dataset = "MUTAG"
 
 generate(dataset)
 
-feats, diags_tmp, filts, labels = load(dataset)
-
-diags = preprocess(diags_tmp)
+diags_tmp, feats, labels = load(dataset)
+diags, filts = preprocess(diags_tmp)
 
 layer_type = "im"
 
@@ -23,9 +22,9 @@ perm_op = "sum"
 keep = 5  # only useful if perm_op = "topk"
 
 weight="grid"
-grid_size=[10, 10]
+grid_size=(10, 10)
 # Parameter specific to layer_type="im"
-image_size=[10, 10]
+image_size=(10, 10)
 # Parameter specific to layer_type="gs"
 num_gaussians=50
 # Parameter specific to layer_type="pm"
@@ -48,4 +47,4 @@ lr = 0.01
 num_epoch = 100
 optim_parameters = {"decay":decay,"lr":lr, "num_epoch":num_epoch}
 
-single_run(diags, feats, labels, filts, model, optim_parameters)
+single_run(diags, feats, labels, filts, model, optim_parameters, test_size=0.1)

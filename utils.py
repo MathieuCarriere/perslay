@@ -1,4 +1,4 @@
-"""Module :mod:`oerskay.archi` implement the persistence layer."""
+"""Module :mod:`perslay.utils` provide utils functions."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 #          Theo Lacombe <theo.lacombe@inria.fr>
