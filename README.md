@@ -14,10 +14,10 @@ It contains a jupyter notebook `tutorialPersLay.ipynb` to try PersLay on graphs
 All the code was implemented in `Python 3.6`.
 It is likely that more recent versions would also work.
 
-To install the dependencies run `bash make dep`. Notice that
+To install the dependencies run `make dep`. Notice that
 gudhi is not pip installable, as thus you won't get around this step. Even if you
 install this module via pip
-with `bash pip install git+https://github.com/MathieuCarriere/perslay`.
+with `pip install git+https://github.com/MathieuCarriere/perslay`.
 
 ## Minimal (just using PersLay)
 
