@@ -92,7 +92,12 @@ Feel free to contact one of the authors if you want more information.
 
 # How to call and use PersLay
 
-PersLay takes four arguments: the first three ones are **output** which is the list that will contain the output of PersLay, **name** which is a string defining the name of the PersLay operation for tensorflow, **diag** which is a numpy array containing the persistence diagrams, and the fourth argument is a python dictionary containing the parameters of PersLay. This dictionary must have the following keys: 
+
+PersLay takes four arguments:
+
+  * the first three ones are: **output** which is the list that will contain the output of PersLay, **name** which is a string defining the name of the PersLay operation for tensorflow, and **diag** which is a numpy array containing the persistence diagrams.
+
+  * the fourth argument is a python dictionary containing the parameters of PersLay. This dictionary must have the following keys: 
 
     | **name** | **description** |
     | --- | --- |
