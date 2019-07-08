@@ -6,7 +6,7 @@ Feel free to contact the authors for any remark, suggestion, bug, etc.
 This repository provides the implementation of PersLay, a tensorflow layer specifically desgined to handle persistence diagrams.
 This implementation follows the work presented in [1].
 
-It contains a jupyter notebook `experiments.ipynb` to try PersLay on graphs and orbits data as in [1].
+It contains a jupyter notebook `tutorialPersLay.ipynb` to try PersLay on graphs and orbits data as in [1].
 
 PersLay can be installed by running the following instructions in a terminal:
 
@@ -42,7 +42,7 @@ This notebook has a few more dependencies.
 - `matplotlib: 3.0.3`
 - `h5py: 2.8.0` and `hdf5: 1.10.2` (used to store and load persistence diagrams)
 
-Furthermore, `jupyter notebook` (or equivalent) is needed to run `experiments.ipynb`.
+Furthermore, `jupyter notebook` (or equivalent) is needed to run `tutorialPersLay.ipynb`.
 
 ### GUDHI
 
