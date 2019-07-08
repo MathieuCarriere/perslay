@@ -46,13 +46,11 @@ Furthermore, `jupyter notebook` (or equivalent) is needed to run `experiments.ip
 
 ### GUDHI
 
-In order to generate persistence diagrams, we rely on two libraries.
-
-GUDHI is a C++/python library whose python version can be installed using 
+In order to generate persistence diagrams, we rely on the GUDHI library, which is a C++/python library whose python version can be installed using 
 
 	$ conda install -c conda-forge gudhi
 
-Otherwise, one can follow the steps at http://gudhi.gforge.inria.fr/python/latest/installation.html .
+Otherwise, one can follow the steps at http://gudhi.gforge.inria.fr/python/latest/installation.html.
 
 <!--An additional required package is the `sklearn-tda` package provided at https://github.com/MathieuCarriere/sklearn_tda .
 To install this package, run the following instructions in a terminal:
