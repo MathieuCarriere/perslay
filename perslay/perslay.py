@@ -99,7 +99,7 @@ def perslay(output, name, diag, **kwargs):
 
     # First layer of channel: processing of the persistence diagrams by vectorization of diagram points
     if kwargs["layer"] == "pm":  # Channel with permutation equivariant layers
-        for idx, (dim, pop) in enumerate(peq):
+        for idx, (dim, pop) in enumerate(kwargs["peq"]):
             with tf.variable_scope(name + "-perm_eq-" + str(idx)):
                 tensor_diag = permutation_equivariant_layer(tensor_diag, dim, pop, kwargs["weight_init"], kwargs["weight_init"], kwargs["bias_init"], kwargs["weight_const"], kwargs["weight_const"], kwargs["bias_const"])
     elif kwargs["layer"] == "gs":  # Channel with gaussian layer
@@ -127,8 +127,8 @@ def perslay(output, name, diag, **kwargs):
         # Permutation invariant operation
         if kwargs["perm_op"] == "topk":  # k first values
             masked_layer_t = tf.transpose(masked_layer, perm=[0, 2, 1])
-            values, indices = tf.nn.top_k(masked_layer_t, k=keep)
-            vector = tf.reshape(values, [-1, keep * tensor_diag.shape[2].value])
+            values, indices = tf.nn.top_k(masked_layer_t, k=kwargs["keep"])
+            vector = tf.reshape(values, [-1, kwargs["keep"] * tensor_diag.shape[2].value])
         elif kwargs["perm_op"] == "sum":  # sum
             vector = tf.reduce_sum(masked_layer, axis=1)
         elif kwargs["perm_op"] == "max":  # maximum
