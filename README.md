@@ -50,9 +50,7 @@ In order to generate persistence diagrams, we rely on two libraries.
 
 GUDHI is a C++/python library whose python version can be installed using 
 
-'''
 	$ conda install -c conda-forge gudhi
-'''
 
 Otherwise, one can follow the steps at http://gudhi.gforge.inria.fr/python/latest/installation.html .
 
