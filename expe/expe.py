@@ -27,6 +27,7 @@ def _evaluate_nn_model(LB, FT, DG,
                        num_tower, tower_type,
                        num_epochs, decay, learning_rate, tower_size,
                        verbose=True):
+
     with tf.device("/cpu:0"):
         num_pts, num_labels, num_features, num_filt = LB.shape[0], LB.shape[1], FT.shape[1], len(DG)
 
@@ -332,26 +333,48 @@ def single_reproduce(dataset, model):
     elif dataset_type == "orbit":
         test_size = 0.3  # Size of test set
 
-    print("Doing a Single Run on the dataset: " + dataset + " with a "
+    print("Doing a single run on the dataset: " + dataset + " with a "
           + str(int(100 * (1-test_size))) + "-" + str(int(100 * test_size))+" split.")
 
     print("Filtrations used:")
     print(list_filtrations)
     print("Thresholding in diagrams:", thresh)
+
     print(" ***** PersLay parameters: *****")
-    layer_type = perslay_parameters["layer"]
-    print("Layer type:", layer_type)
-    if layer_type == "im":
-        print("image size:", perslay_parameters["image_size"])
-    elif layer_type == "pm":
-        print("peq:", perslay_parameters["peq"])
-    print("grid size:", perslay_parameters["grid_size"])
+    print("Layer:",                                  perslay_parameters["layer"])
+    layer = perslay_parameters["layer"]
+    if layer == "im":
+        print("  image size:",                         perslay_parameters["image_size"])
+        print("  image boundaries:",                   perslay_parameters["image_bnds"])
+        print("  convolution operations:",             perslay_parameters["cv_layers"])
+    elif layer == "pm":
+        print("  permutation equivariant operations:", perslay_parameters["peq"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "ls":
+        print("  number of samples:",                  perslay_parameters["num_samples"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "gs":
+        print("  number of Gaussians:",                perslay_parameters["num_gaussians"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    
+    print("Weight function:",                          perslay_parameters["persistence_weight"])
+    weight = perslay_parameters["persistence_weight"]
+    if weight == "grid":
+        print("  grid size:",                          perslay_parameters["grid_size"])
+        print("  grid boundaries:" ,                   perslay_parameters["grid_bnds"])
+
+    print("Permutation invariant operation:",          perslay_parameters["perm_op"])
+    pop = perslay_parameters["perm_op"]
+    if pop == "topk":
+        print("  number of largest values",            perslay_parameters["keep"]) 
+
     print("***** Optimization parameters *****")
-    print("Optimizer:", "adam")
-    print("Number of epochs:", optim_parameters["num_epoch"])
-    print("Learning rate:", optim_parameters["lr"])
-    print("Decay:", optim_parameters["decay"])
+    print("Optimizer:",          "ADAM")
+    print("Number of epochs:",   optim_parameters["num_epoch"])
+    print("Learning rate:",      optim_parameters["lr"])
+    print("Decay:",              optim_parameters["decay"])
     print("*"*20)
+
     # Specify here if you have one or several GPUs or CPUs,
     # as well as number of epochs, batch size and validation size.
     # If you do not want to use validation sets for early stopping, set valid_size to 0.
@@ -429,21 +452,42 @@ def single_run(diags, feats, labels,
     print("Filtrations used:")
     print(list_filtrations)
     print("Thresholding in diagrams:", thresh)
+
     print(" ***** PersLay parameters: *****")
-    layer_type = perslay_parameters["layer_type"]
-    print("Layer type:", layer_type)
-    if layer_type == "im":
-        print("image size:", perslay_parameters["image_size"])
-    elif layer_type == "pm":
-        print("pm_dimension:", perslay_parameters["pm_dimension"])
-    if perslay_parameters["weight"] == "grid":
-        print("grid size:", perslay_parameters["grid_size"])
+    print("Layer:",                                  perslay_parameters["layer"])
+    layer = perslay_parameters["layer"]
+    if layer == "im":
+        print("  image size:",                         perslay_parameters["image_size"])
+        print("  image boundaries:",                   perslay_parameters["image_bnds"])
+        print("  convolution operations:",             perslay_parameters["cv_layers"])
+    elif layer == "pm":
+        print("  permutation equivariant operations:", perslay_parameters["peq"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "ls":
+        print("  number of samples:",                  perslay_parameters["num_samples"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "gs":
+        print("  number of Gaussians:",                perslay_parameters["num_gaussians"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    
+    print("Weight function:",                          perslay_parameters["persistence_weight"])
+    weight = perslay_parameters["persistence_weight"]
+    if weight == "grid":
+        print("  grid size:",                          perslay_parameters["grid_size"])
+        print("  grid boundaries:" ,                   perslay_parameters["grid_bnds"])
+
+    print("Permutation invariant operation:",          perslay_parameters["perm_op"])
+    pop = perslay_parameters["perm_op"]
+    if pop == "topk":
+        print("  number of largest values",            perslay_parameters["keep"]) 
+
     print("***** Optimization parameters *****")
-    print("Optimizer:", "adam")
-    print("Number of epochs:", optim_parameters["num_epoch"])
-    print("Learning rate:", optim_parameters["lr"])
-    print("Decay:", optim_parameters["decay"])
+    print("Optimizer:",          "ADAM")
+    print("Number of epochs:",   optim_parameters["num_epoch"])
+    print("Learning rate:",      optim_parameters["lr"])
+    print("Decay:",              optim_parameters["decay"])
     print("*"*20)
+
     # Specify here if you have one or several GPUs or CPUs,
     # as well as number of epochs, batch size and validation size.
     # If you do not want to use validation sets for early stopping, set valid_size to 0.
