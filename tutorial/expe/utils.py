@@ -20,7 +20,10 @@ import matplotlib.pyplot as plt
 
 import h5py
 
+from ot.bregman import sinkhorn
+
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.metrics import pairwise_distances
 
 from scipy.sparse import csgraph
 from scipy.io import loadmat, savemat
@@ -184,6 +187,113 @@ def _save_matrix(A, gid, label, path):
         'A': A
     }
     return savemat(file_name=path + mat_name, mdict=mat_file)
+
+
+def Cantor_pairing(k1, k2):
+    return int(k2 + (k1+k2)*(1+k1+k2)/2)
+
+def generate_for_visu(dataset, list_times, dgm_type="Ord0", idx=0, path_out="./", path_in="./", bnds=[0.,1.,0.,1.]):
+
+    path_dataset = path_in + dataset + "/"
+    graph_name = os.listdir(path_dataset + "mat/")[idx]
+    A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
+    L = csgraph.laplacian(A, normed=True)
+    egvals, egvectors = eigh(L)
+    basesimplex = _get_base_simplex(A)
+
+    LDgm = []
+    for hks_time in list_times:
+        filtration_val = _hks_signature(egvectors, egvals, time=hks_time)
+        dgmOrd0, dgmExt0, dgmRel1, dgmExt1 = _apply_graph_extended_persistence(A, filtration_val, basesimplex)
+        DD = np.array([[bnds[0], bnds[2]],[bnds[1], bnds[2]],[bnds[0], bnds[3]],[bnds[1], bnds[3]]])
+        if dgm_type == "Ord0":
+            D = np.vstack([dgmOrd0, DD])
+            #LDgm.append(dgmOrd0)
+        if dgm_type == "Rel1":
+            D = np.vstack([dgmRel1, DD])
+            #LDgm.append(dgmRel1)
+        if dgm_type == "Ext1":
+            D = np.vstack([dgmExt1, DD])
+            #LDgm.append(dgmExt1)
+        if dgm_type == "Ext0":
+            D = np.vstack([dgmExt0, DD])
+            #LDgm.append(dgmExt0)
+        LDgm.append(D)
+
+    M = []
+    for idx in range(len(list_times)-1):
+
+        D1, D2 = LDgm[idx], LDgm[idx+1]
+        n1, n2 = D1.shape[0], D2.shape[0]
+        gamma = sinkhorn( a=(1/n1) * np.ones(n1), b=(1/n2) * np.ones(n2), M=pairwise_distances(D1, D2, metric="euclidean"), reg=1e-1 )
+        mappings = [np.zeros(n1, dtype=np.int32), np.zeros(n2, dtype=np.int32)]
+        for i in range(n1):
+            mappings[0][i] = np.argmax(gamma[i,:])
+        for i in range(n2):
+            mappings[1][i] = np.argmax(gamma[:,i])
+        M.append([ [(i, mappings[0][i]) for i in range(n1)], [(i, mappings[1][i]) for i in range(n2)] ])
+
+    f_config  = open(path_out + "tower_config.txt",  "w")
+    f_layers  = open(path_out + "tower_layers.txt",  "w")
+    f_layout  = open(path_out + "tower_layout.txt",  "w")
+    f_edges   = open(path_out + "tower_edges.txt",   "w")
+    f_colors  = open(path_out + "tower_colors.txt",  "w")
+
+    f_config.write("data/dgm_tower/tower_edges.txt;data/dgm_tower/tower_layers.txt;data/dgm_tower/tower_layout.txt;")
+    f_layers.write("layerID layerLabel\n")
+    f_layout.write("nodeID nodeLabel nodeX nodeY\n")
+    f_colors.write("nodeID layerID color size\n")
+
+    layer_names = [str(round(t,2)) for t in list_times]
+    #layer_names = ["t" + str(idx) for idx in range(len(list_times))]
+    node_name, layout, edges, colors = {}, {}, [], []
+    node_ID = 1
+
+    for idx, dgm in enumerate(LDgm):
+
+        l_idx = idx + 1
+        f_layers.write(str(l_idx) + " " + layer_names[idx] + "\n")
+
+        for idx_pt in range(len(dgm)):
+            Cantor_idx = Cantor_pairing(idx_pt,idx)
+            node_name[Cantor_idx] = node_ID
+            layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]), str(dgm[idx_pt,1])]
+            
+            if len(dgm) - idx_pt <= 4:
+                cols = "\"#%02x%02x%02x\"" % (0,0,0)
+                size = 0.01
+
+            else:
+                cols = "\"#%02x%02x%02x\"" % (125,50,100)
+                size = 1
+
+            colors.append([str(node_ID), str(l_idx), str(cols), str(size)])
+            node_ID += 1
+
+    for idx in range(len(LDgm)-1):
+
+        l_idx = idx + 1
+        mapping = M[idx][0]
+        for idxc, (p,q) in enumerate(mapping):
+            edges.append([str(node_name[Cantor_pairing(p,idx)]), str(l_idx), str(node_name[Cantor_pairing(q,idx+1)]), str(l_idx+1), "1"])
+        #mapping = M[idx][1]
+        #for idxc, (q,p) in enumerate(mapping):
+        #    edges.append([str(node_name[Cantor_pairing(p,idx)]), str(l_idx), str(node_name[Cantor_pairing(q,idx+1)]), str(l_idx+1), "1"])
+
+    for key, line in iter(layout.items()):
+        f_layout.write(" ".join([str(key)] + line) + "\n")
+
+    for line in edges:
+        f_edges.write(" ".join(line) + "\n")
+
+    for line in colors:	
+        f_colors.write(" ".join(line) + "\n")
+
+    f_config.close()
+    f_layers.close()
+    f_layout.close()
+    f_edges.close()
+    f_colors.close()
 
 
 def generate(dataset):
