@@ -97,6 +97,13 @@ def perslay(output, name, diag, **kwargs):
                 indices.append(tf.cast(ids, tf.int32))
             weight = tf.expand_dims(tf.gather_nd(params=W, indices=tf.concat(indices, axis=2)), -1)
 
+    if kwargs["persistence_weight"] == "gmix":
+        with tf.variable_scope(name + "-gmix_pweight"):
+            M = tf.get_variable("M", shape=[1,1,2,kwargs["gmix_num"]], initializer=kwargs["gmix_m_init"]) if not kwargs["gmix_m_const"] else tf.get_variable("M", initializer=kwargs["gmix_m_init"])
+            V = tf.get_variable("V", shape=[1,1,2,kwargs["gmix_num"]], initializer=kwargs["gmix_v_init"]) if not kwargs["gmix_v_const"] else tf.get_variable("V", initializer=kwargs["gmix_v_init"])
+            bc_inp = tf.expand_dims(tensor_diag, -1)
+            weight = tf.expand_dims(tf.reduce_sum(tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - M), tf.square(V)), axis=2)), axis=2), -1)
+
     # First layer of channel: processing of the persistence diagrams by vectorization of diagram points
     if kwargs["layer"] == "pm":  # Channel with permutation equivariant layers
         for idx, (dim, pop) in enumerate(kwargs["peq"]):

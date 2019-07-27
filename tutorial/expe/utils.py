@@ -192,6 +192,16 @@ def _save_matrix(A, gid, label, path):
 def Cantor_pairing(k1, k2):
     return int(k2 + (k1+k2)*(1+k1+k2)/2)
 
+def compute_mappings(D1, D2):
+    n1, n2 = D1.shape[0], D2.shape[0]
+    gamma = sinkhorn( a=(1/n1) * np.ones(n1), b=(1/n2) * np.ones(n2), M=pairwise_distances(D1, D2, metric="euclidean"), reg=1e-1 )
+    mappings = [np.zeros(n1, dtype=np.int32), np.zeros(n2, dtype=np.int32)]
+    for i in range(n1):
+        mappings[0][i] = np.argmax(gamma[i,:])
+    for i in range(n2):
+        mappings[1][i] = np.argmax(gamma[:,i])
+    return mappings
+
 def generate_for_visu(dataset, list_times, dgm_type="Ord0", idx=0, path_out="./", path_in="./", bnds=[0.,1.,0.,1.]):
 
     path_dataset = path_in + dataset + "/"
@@ -201,37 +211,52 @@ def generate_for_visu(dataset, list_times, dgm_type="Ord0", idx=0, path_out="./"
     egvals, egvectors = eigh(L)
     basesimplex = _get_base_simplex(A)
 
-    LDgm = []
+    LDgm, LOrd0, LExt1, LExt0, LRel1 = [], [], [], [], []
     for hks_time in list_times:
         filtration_val = _hks_signature(egvectors, egvals, time=hks_time)
         dgmOrd0, dgmExt0, dgmRel1, dgmExt1 = _apply_graph_extended_persistence(A, filtration_val, basesimplex)
         DD = np.array([[bnds[0], bnds[2]],[bnds[1], bnds[2]],[bnds[0], bnds[3]],[bnds[1], bnds[3]]])
-        if dgm_type == "Ord0":
-            D = np.vstack([dgmOrd0, DD])
-            #LDgm.append(dgmOrd0)
-        if dgm_type == "Rel1":
-            D = np.vstack([dgmRel1, DD])
-            #LDgm.append(dgmRel1)
-        if dgm_type == "Ext1":
-            D = np.vstack([dgmExt1, DD])
-            #LDgm.append(dgmExt1)
-        if dgm_type == "Ext0":
-            D = np.vstack([dgmExt0, DD])
-            #LDgm.append(dgmExt0)
-        LDgm.append(D)
+        LOrd0.append(dgmOrd0)
+        LRel1.append(dgmRel1)
+        LExt1.append(dgmExt1)
+        LExt0.append(dgmExt0)
+        LDgm.append(np.vstack([dgmOrd0,dgmExt0,dgmExt1,dgmRel1,DD]))
 
     M = []
     for idx in range(len(list_times)-1):
 
-        D1, D2 = LDgm[idx], LDgm[idx+1]
-        n1, n2 = D1.shape[0], D2.shape[0]
-        gamma = sinkhorn( a=(1/n1) * np.ones(n1), b=(1/n2) * np.ones(n2), M=pairwise_distances(D1, D2, metric="euclidean"), reg=1e-1 )
-        mappings = [np.zeros(n1, dtype=np.int32), np.zeros(n2, dtype=np.int32)]
-        for i in range(n1):
-            mappings[0][i] = np.argmax(gamma[i,:])
-        for i in range(n2):
-            mappings[1][i] = np.argmax(gamma[:,i])
-        M.append([ [(i, mappings[0][i]) for i in range(n1)], [(i, mappings[1][i]) for i in range(n2)] ])
+        nOrd01, nOrd02 = len(LOrd0[idx]), len(LOrd0[idx+1])
+        if nOrd01 > 0 and nOrd02 > 0:
+            mappingsOrd0 = compute_mappings(LOrd0[idx], LOrd0[idx+1])
+        nExt01, nExt02 = len(LExt0[idx]), len(LExt0[idx+1])
+        if nExt01 > 0 and nExt02 > 0:
+            mappingsExt0 = compute_mappings(LExt0[idx], LExt0[idx+1])
+        nExt11, nExt12 = len(LExt1[idx]), len(LExt1[idx+1])
+        if nExt11 > 0 and nExt12 > 0:
+            mappingsExt1 = compute_mappings(LExt1[idx], LExt1[idx+1])
+        nRel11, nRel12 = len(LRel1[idx]), len(LRel1[idx+1])
+        if nRel11 > 0 and nRel12 > 0:
+            mappingsRel1 = compute_mappings(LRel1[idx], LRel1[idx+1])
+
+        M.append([[],[]])
+
+        if nOrd01 > 0 and nOrd02 > 0:
+            M[-1][0] += [(i, mappingsOrd0[0][i]) for i in range(nOrd01)]
+            M[-1][1] += [(i, mappingsOrd0[1][i]) for i in range(nOrd02)]
+        if nExt01 > 0 and nExt02 > 0:
+            M[-1][0] += [(nOrd01 + i, nOrd02 + mappingsExt0[0][i]) for i in range(nExt01)]
+            M[-1][1] += [(nOrd02 + i, nOrd01 + mappingsExt0[1][i]) for i in range(nExt02)]
+        if nExt11 > 0 and nExt12 > 0:
+            M[-1][0] += [(nOrd01 + nExt01 + i, nOrd02 + nExt02 + mappingsExt1[0][i]) for i in range(nExt11)]
+            M[-1][1] += [(nOrd02 + nExt02 + i, nOrd01 + nExt01 + mappingsExt1[1][i]) for i in range(nExt12)]
+        if nRel11 > 0 and nRel12 > 0:
+            M[-1][0] += [(nOrd01 + nExt01 + nExt11 + i, nOrd02 + nExt02 + nExt12 + mappingsRel1[0][i]) for i in range(nRel11)]
+            M[-1][1] += [(nOrd02 + nExt02 + nExt12 + i, nOrd01 + nExt01 + nExt11 + mappingsRel1[1][i]) for i in range(nRel12)]
+
+        M[-1][0].append((nOrd01 + nExt01 + nExt11 + nRel11,       nOrd02 + nExt02 + nExt12 + nRel12))
+        M[-1][0].append((nOrd01 + nExt01 + nExt11 + nRel11 + 1,   nOrd02 + nExt02 + nExt12 + nRel12 + 1))
+        M[-1][0].append((nOrd01 + nExt01 + nExt11 + nRel11 + 2,   nOrd02 + nExt02 + nExt12 + nRel12 + 2))
+        M[-1][0].append((nOrd01 + nExt01 + nExt11 + nRel11 + 3,   nOrd02 + nExt02 + nExt12 + nRel12 + 3))
 
     f_config  = open(path_out + "tower_config.txt",  "w")
     f_layers  = open(path_out + "tower_layers.txt",  "w")
@@ -255,16 +280,45 @@ def generate_for_visu(dataset, list_times, dgm_type="Ord0", idx=0, path_out="./"
         f_layers.write(str(l_idx) + " " + layer_names[idx] + "\n")
 
         for idx_pt in range(len(dgm)):
+
+            nOrd0 = len(LOrd0[idx])
+            nExt0 = len(LExt0[idx])
+            nExt1 = len(LExt1[idx])
+            nRel1 = len(LRel1[idx])
+
             Cantor_idx = Cantor_pairing(idx_pt,idx)
             node_name[Cantor_idx] = node_ID
-            layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]), str(dgm[idx_pt,1])]
-            
+
             if len(dgm) - idx_pt <= 4:
+                if idx_pt == len(dgm)-1:
+                    layout[node_ID] = ["n" + str(node_ID), str(2*dgm[idx_pt,0]), str(2*dgm[idx_pt,1])]
+                if idx_pt == len(dgm)-2:
+                    layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]), str(2*dgm[idx_pt,1])]
+                if idx_pt == len(dgm)-3:
+                    layout[node_ID] = ["n" + str(node_ID), str(2*dgm[idx_pt,0]),   str(dgm[idx_pt,1])]
+                if idx_pt == len(dgm)-4:
+                    layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]),   str(dgm[idx_pt,1])]
                 cols = "\"#%02x%02x%02x\"" % (0,0,0)
                 size = 0.01
 
-            else:
-                cols = "\"#%02x%02x%02x\"" % (125,50,100)
+            if idx_pt < nOrd0:
+                layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]), str(dgm[idx_pt,1])]
+                cols = "\"#%02x%02x%02x\"" % (128,0,0)
+                size = 1
+
+            if nOrd0 <= idx_pt < nOrd0 + nExt0:
+                layout[node_ID] = ["n" + str(node_ID), str(bnds[1] + dgm[idx_pt,0]), str(dgm[idx_pt,1])]
+                cols = "\"#%02x%02x%02x\"" % (0,128,0)
+                size = 1
+
+            if nOrd0 + nExt0 <= idx_pt < nOrd0 + nExt0 + nExt1:
+                layout[node_ID] = ["n" + str(node_ID), str(dgm[idx_pt,0]), str(bnds[3] + dgm[idx_pt,1])]
+                cols = "\"#%02x%02x%02x\"" % (0,0,128)
+                size = 1
+
+            if nOrd0 + nExt0 + nExt1 <= idx_pt < nOrd0 + nExt0 + nExt1 + nRel1:
+                layout[node_ID] = ["n" + str(node_ID), str(bnds[1] + dgm[idx_pt,0]), str(bnds[3] + dgm[idx_pt,1])]
+                cols = "\"#%02x%02x%02x\"" % (128,128,128)
                 size = 1
 
             colors.append([str(node_ID), str(l_idx), str(cols), str(size)])
