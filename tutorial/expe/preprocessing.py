@@ -195,4 +195,4 @@ def preprocess(diag, thresh=500):
         D_pad.append(np.concatenate([D[dt][i][np.newaxis, :] for i in range(len(D[dt]))], axis=0))
         # print(D_pad[dt].shape)
 
-    return D_pad, filts
+    return D_pad, prm.keys()

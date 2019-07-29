@@ -176,14 +176,7 @@ def _evaluate_nn_model(LB, FT, DG,
             if weight_fun == "gmix":
                 means = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/M")[0])
                 varis = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/V")[0])
-                x = np.arange(-.2, 1.2, .01)
-                y = np.arange(-.2, 1.2, .01)
-                xx, yy = np.meshgrid(x, y)
-                z = np.zeros(xx.shape)
-                
-                for idx_g in range(means.shape[3]):
-                    z += np.exp(-((xx-means[0,0,0,idx_g])**2/(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/(varis[0,0,1,idx_g])))
-                weights[nf].append((xx,yy,z))                
+                weights[nf].append((means,varis))                
 
         list_train_accs, list_valid_accs, list_test_accs = [], [], []
         # Training with optimization of parameters
@@ -204,13 +197,7 @@ def _evaluate_nn_model(LB, FT, DG,
                 if weight_fun == "gmix":
                     means = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/M")[0])
                     varis = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/V")[0])
-                    x = np.arange(-.2, 1.2, .01)
-                    y = np.arange(-.2, 1.2, .01)
-                    xx, yy = np.meshgrid(x, y)
-                    z = np.zeros(xx.shape)
-                    for idx_g in range(means.shape[3]):
-                        z += np.exp(-((xx-means[0,0,0,idx_g])**2/np.square(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/np.square(varis[0,0,1,idx_g])))
-                    weights[nf].append((xx,yy,z))
+                    weights[nf].append((means,varis))
            
             # Switch to test mode and evaluate train and test accuracy
             sess.run(switch_to_test_mode_op)
@@ -478,7 +465,9 @@ def single_run(diags, feats, labels,
                list_filtrations, model,
                optim_parameters,
                test_size,
-               thresh=500):
+               thresh=500,
+               visualize_weight=False,
+               **kwargs):
     # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
     num_folds = 1  # Number of splits
 
@@ -563,23 +552,53 @@ def single_run(diags, feats, labels,
         ax.set_title("Evolution of train/test accuracy")
         plt.show()
 
-        if model.get_parameters()["persistence_weight"] == "grid":
-            fig = plt.figure(figsize=(10,20))
-            for nf in range(model.num_filts):
-                ax = fig.add_subplot(model.num_filts,2,2*nf+1)
-                ax.imshow(weights[nf][0], cmap="Purples",  vmin=0., vmax=2.)
-                ax = fig.add_subplot(model.num_filts,2,2*(nf+1))
-                ax.imshow(weights[nf][-1], cmap="Purples", vmin=0., vmax=2.)
-            plt.show()
+        if visualize_weight:
 
-        if model.get_parameters()["persistence_weight"] == "gmix":
-            fig = plt.figure(figsize=(10,20))
-            for nf in range(model.num_filts):
-                ax = fig.add_subplot(model.num_filts,2,2*nf+1)
-                ax.contourf(weights[nf][0][0], weights[nf][0][1], weights[nf][0][2])
-                ax = fig.add_subplot(model.num_filts,2,2*(nf+1))
-                ax.contourf(weights[nf][-1][0], weights[nf][-1][1], weights[nf][-1][2])
-            plt.show()
+            filts = list(list_filtrations) #[k for k in list_filtrations.keys()]
+            if model.get_parameters()["persistence_weight"] == "grid":
+
+                fig = plt.figure(figsize=(10,20))
+
+                for nf in range(model.num_filts):
+
+                    plt.subplot(model.num_filts,2,2*nf+1)
+                    plt.imshow(weights[nf][0], cmap="Purples",  vmin=kwargs["gmin"], vmax=kwargs["gmax"])
+                    plt.title(filts[nf] + " -- before training")
+                    plt.colorbar()
+
+                    plt.subplot(model.num_filts,2,2*(nf+1))
+                    plt.imshow(weights[nf][-1], cmap="Purples", vmin=kwargs["gmin"], vmax=kwargs["gmax"])
+                    plt.title(filts[nf] + " -- after training")
+                    plt.colorbar()
+
+                plt.show()
+
+            if model.get_parameters()["persistence_weight"] == "gmix":
+
+                x = np.arange(kwargs["xmin"], kwargs["xmax"], kwargs["xstep"])
+                y = np.arange(kwargs["ymin"], kwargs["ymax"], kwargs["ystep"])
+                xx, yy = np.meshgrid(x, y)
+
+                fig = plt.figure(figsize=(10,20))
+
+                for nf in range(model.num_filts):
+
+                    ax = fig.add_subplot(model.num_filts,2,2*nf+1)
+                    means, varis = weights[nf][0][0], weights[nf][0][1]
+                    z = np.zeros(xx.shape)
+                    for idx_g in range(means.shape[3]):
+                        z += np.exp(-((xx-means[0,0,0,idx_g])**2/(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/(varis[0,0,1,idx_g])))
+                    ax.contourf(xx, yy, z)
+                    ax.title.set_text(filts[nf] + " -- before training")
+
+                    ax = fig.add_subplot(model.num_filts,2,2*(nf+1))
+                    means, varis = weights[nf][-1][0], weights[nf][-1][1]
+                    z = np.zeros(xx.shape)
+                    for idx_g in range(means.shape[3]):
+                        z += np.exp(-((xx-means[0,0,0,idx_g])**2/(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/(varis[0,0,1,idx_g])))
+                    ax.contourf(xx, yy, z)
+                    ax.title.set_text(filts[nf] + " -- after training")
+                plt.show()
 
     return
 
