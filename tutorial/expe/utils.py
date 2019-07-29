@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import os.path
 
-
 from ast import literal_eval
 import itertools
 
@@ -19,8 +18,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import h5py
-
-from ot.bregman import sinkhorn
 
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.metrics import pairwise_distances
@@ -193,6 +190,13 @@ def Cantor_pairing(k1, k2):
     return int(k2 + (k1+k2)*(1+k1+k2)/2)
 
 def compute_mappings(D1, D2):
+   
+    try:
+        from ot.bregman import sinkhorn
+    except ModuleNotFoundError:
+        print("POT not found")
+        return
+
     n1, n2 = D1.shape[0], D2.shape[0]
     gamma = sinkhorn( a=(1/n1) * np.ones(n1), b=(1/n2) * np.ones(n2), M=pairwise_distances(D1, D2, metric="euclidean"), reg=1e-1 )
     mappings = [np.zeros(n1, dtype=np.int32), np.zeros(n2, dtype=np.int32)]
