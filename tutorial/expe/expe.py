@@ -166,6 +166,25 @@ def _evaluate_nn_model(LB, FT, DG,
         sess.run(init)
         sess.run(switch_to_train_mode_op)
 
+        perslay_parameters = model.get_parameters()
+        weight_fun = perslay_parameters["persistence_weight"]
+
+        weights = [[] for _ in range(model.num_filts)]
+        for nf in range(model.num_filts):
+            if weight_fun == "grid":
+                weights[nf].append(np.flip(sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-grid_pweight/W")[0]).T, 0))
+            if weight_fun == "gmix":
+                means = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/M")[0])
+                varis = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/V")[0])
+                x = np.arange(-.2, 1.2, .01)
+                y = np.arange(-.2, 1.2, .01)
+                xx, yy = np.meshgrid(x, y)
+                z = np.zeros(xx.shape)
+                
+                for idx_g in range(means.shape[3]):
+                    z += np.exp(-((xx-means[0,0,0,idx_g])**2/(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/(varis[0,0,1,idx_g])))
+                weights[nf].append((xx,yy,z))                
+
         list_train_accs, list_valid_accs, list_test_accs = [], [], []
         # Training with optimization of parameters
         for epoch in xrange(num_epochs):
@@ -178,6 +197,21 @@ def _evaluate_nn_model(LB, FT, DG,
                 sess.run(train_op, feed_dict=feed_batch)
             sess.run(increase_global_step)
 
+            # Retrieve weight matrices
+            for nf in range(model.num_filts):
+                if weight_fun == "grid":
+                    weights[nf].append(np.flip(sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-grid_pweight/W")[0]).T, 0))
+                if weight_fun == "gmix":
+                    means = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/M")[0])
+                    varis = sess.run(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "perslay-" + str(nf) + "-gmix_pweight/V")[0])
+                    x = np.arange(-.2, 1.2, .01)
+                    y = np.arange(-.2, 1.2, .01)
+                    xx, yy = np.meshgrid(x, y)
+                    z = np.zeros(xx.shape)
+                    for idx_g in range(means.shape[3]):
+                        z += np.exp(-((xx-means[0,0,0,idx_g])**2/np.square(varis[0,0,0,idx_g]) + (yy-means[0,0,1,idx_g])**2/np.square(varis[0,0,1,idx_g])))
+                    weights[nf].append((xx,yy,z))
+           
             # Switch to test mode and evaluate train and test accuracy
             sess.run(switch_to_test_mode_op)
             train_acc, valid_acc, test_acc = 0, 0, 0
@@ -196,7 +230,7 @@ def _evaluate_nn_model(LB, FT, DG,
             # Go back to train mode
             sess.run(switch_to_train_mode_op)
 
-    return list_train_accs, list_valid_accs, list_test_accs
+    return list_train_accs, list_valid_accs, list_test_accs, weights
 
 
 def _run_expe(dataset, model, num_run=1):
@@ -280,9 +314,9 @@ def _run_expe(dataset, model, num_run=1):
             tf.reset_default_graph()
 
             # Evaluation of neural network
-            ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
-                                                       instance_model, num_tower, tower_type, num_epochs,
-                                                       decay, learn_rate, batch_size, verbose)
+            ltrain, lvalid, ltest, weights = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+                                                                instance_model, num_tower, tower_type, num_epochs,
+                                                                decay, learn_rate, batch_size, verbose)
             train_accs_res[idx_score, idx, :] = np.array(ltrain)
             valid_accs_res[idx_score, idx, :] = np.array(lvalid)
             test_accs_res[idx_score, idx, :] = np.array(ltest)
@@ -423,9 +457,9 @@ def single_reproduce(dataset, model):
         tf.reset_default_graph()
 
         # Evaluation of neural network
-        ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
-                                                   model, num_tower, tower_type, num_epochs,
-                                                   decay, learn_rate, batch_size, verbose)
+        ltrain, lvalid, ltest, weights = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+                                                            model, num_tower, tower_type, num_epochs,
+                                                            decay, learn_rate, batch_size, verbose)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot(np.array(ltrain), color="blue", label="train acc")
@@ -436,6 +470,7 @@ def single_reproduce(dataset, model):
         ax.set_ylabel("classif. accuracy")
         ax.set_title("Evolution of train/test accuracy for " + dataset)
         plt.show()
+
     return
 
 
@@ -514,7 +549,7 @@ def single_run(diags, feats, labels,
         tf.reset_default_graph()
 
         # Evaluation of neural network
-        ltrain, lvalid, ltest = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
+        ltrain, lvalid, ltest, weights = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
                                                    model, num_tower, tower_type, num_epochs,
                                                    decay, learn_rate, batch_size, verbose=True)
         fig = plt.figure()
@@ -527,6 +562,25 @@ def single_run(diags, feats, labels,
         ax.set_ylabel("classif. accuracy")
         ax.set_title("Evolution of train/test accuracy")
         plt.show()
+
+        if model.get_parameters()["persistence_weight"] == "grid":
+            fig = plt.figure(figsize=(10,20))
+            for nf in range(model.num_filts):
+                ax = fig.add_subplot(model.num_filts,2,2*nf+1)
+                ax.imshow(weights[nf][0], cmap="Purples",  vmin=0., vmax=2.)
+                ax = fig.add_subplot(model.num_filts,2,2*(nf+1))
+                ax.imshow(weights[nf][-1], cmap="Purples", vmin=0., vmax=2.)
+            plt.show()
+
+        if model.get_parameters()["persistence_weight"] == "gmix":
+            fig = plt.figure(figsize=(10,20))
+            for nf in range(model.num_filts):
+                ax = fig.add_subplot(model.num_filts,2,2*nf+1)
+                ax.contourf(weights[nf][0][0], weights[nf][0][1], weights[nf][0][2])
+                ax = fig.add_subplot(model.num_filts,2,2*(nf+1))
+                ax.contourf(weights[nf][-1][0], weights[nf][-1][1], weights[nf][-1][2])
+            plt.show()
+
     return
 
 
