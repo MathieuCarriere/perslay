@@ -599,6 +599,8 @@ def single_run(diags, feats, labels,
                     ax.contourf(xx, yy, z)
                     ax.title.set_text(filts[nf] + " -- after training")
                 plt.show()
+            
+            return weights
 
     return
 
