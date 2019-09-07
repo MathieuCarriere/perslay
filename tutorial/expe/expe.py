@@ -487,7 +487,7 @@ def single_run(diags, feats, labels,
     elif layer == "pm":
         print("  permutation equivariant operations:", perslay_parameters["peq"])
         print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "ls":
+    elif layer == "ls" or layer == "bc" or layer == "en":
         print("  number of samples:",                  perslay_parameters["num_samples"])
         print("  fully-connected operations:",         perslay_parameters["fc_layers"])
     elif layer == "gs":

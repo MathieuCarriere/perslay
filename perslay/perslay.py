@@ -53,19 +53,37 @@ def gaussian_layer(inp, num_gaussians, mean_init, variance_init, mean_const, var
 
 # Landscape PersLay
 def landscape_layer(inp, num_samples, sample_init, sample_const):
-    # num_pts = inp.shape[1].value
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
-    return tf.maximum(inp[:, :, 1:2] - tf.abs(sp - inp[:, :, 0:1]), np.array([0]))
+    return tf.maximum( .5 * (inp[:, :, 1:2] - inp[:, :, 0:1]) - tf.abs(sp - .5 * (inp[:, :, 1:2] + inp[:, :, 0:1])), np.array([0]))
+
+
+# Betti PersLay
+def betti_layer(inp, theta, num_samples, sample_init, sample_const):
+    sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
+    X, Y = inp[:, :, 0:1], inp[:, :, 1:2]
+    return  1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  )
+
+
+# Entropy PersLay
+# WARNING: this function assumes that padding values are zero
+def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
+    bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
+    sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
+    L, X, Y = bp_inp[:, :, 1:2], bp_inp[:, :, 0:1], bp_inp[:, :, 0:1] + bp_inp[:, :, 1:2]
+    LN = tf.multiply(L, 1. / tf.expand_dims(tf.matmul(L[:,:,0], tf.ones([L.shape[1],1])), -1))
+    entropy_terms = tf.where(LN > 0., -tf.multiply(LN, tf.log(LN)), LN)
+    return  tf.multiply(entropy_terms, 1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  ))
 
 
 # Persistence Image PersLay
 def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
+    bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
     coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / image_size[i]) for i in range(dimension_before)]
     M = tf.meshgrid(*coords)
     mu = tf.concat([tf.expand_dims(tens, 0) for tens in M], axis=0)
     sg = tf.get_variable("s", shape=[1, 1, 1] + [1 for _ in range(dimension_before)], initializer=variance_init) if not variance_const else tf.get_variable("s", initializer=variance_init)
-    bc_inp = tf.reshape(inp, [-1, num_pts, dimension_before] + [1 for _ in range(dimension_before)])
+    bc_inp = tf.reshape(bp_inp, [-1, num_pts, dimension_before] + [1 for _ in range(dimension_before)])
     return tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - mu), tf.square(sg)), axis=2))
 
 # PersLay channel for persistence diagrams
@@ -115,6 +133,12 @@ def perslay(output, name, diag, **kwargs):
     elif kwargs["layer"] == "ls":  # Channel with landscape layer
         with tf.variable_scope(name + "-samples"):
             tensor_diag = landscape_layer(tensor_diag, kwargs["num_samples"], kwargs["sample_init"], kwargs["sample_const"])
+    elif kwargs["layer"] == "bc":  # Channel with Betti layer
+        with tf.variable_scope(name + "-samples"):
+            tensor_diag = betti_layer(tensor_diag, kwargs["theta"], kwargs["num_samples"], kwargs["sample_init"], kwargs["sample_const"])
+    elif kwargs["layer"] == "en":  # Channel with entropy layer
+        with tf.variable_scope(name + "-samples"):
+            tensor_diag = entropy_layer(tensor_diag, kwargs["theta"], kwargs["num_samples"], kwargs["sample_init"], kwargs["sample_const"])
     elif kwargs["layer"] == "im":  # Channel with image layer
         with tf.variable_scope(name + "-bandwidth"):
             tensor_diag = image_layer(tensor_diag, kwargs["image_size"], kwargs["image_bnds"], kwargs["variance_init"], kwargs["variance_const"])

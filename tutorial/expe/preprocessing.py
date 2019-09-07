@@ -170,13 +170,13 @@ class _nu_separator(BaseEstimator, TransformerMixin):
 
 def preprocess(diag, thresh=500):
     filts = diag.keys()
-    scaler = [([0, 1],  Pipeline([("1", BirthPersistenceTransform()), ("2", MinMaxScaler())]))]
+    #scaler = [([0, 1],  Pipeline([("1", BirthPersistenceTransform()), ("2", MinMaxScaler())]))]
 
     # Whole pipeline
     tmp = Pipeline([
         ("Selector",      DiagramSelector(use=True, point_type="finite")),
         ("ProminentPts",  ProminentPoints(use=True, num_pts=400, point_type="finite")),
-        ("Scaler",        DiagramPreprocessor(use=True,  scalers=scaler)),
+        ("Scaler",        DiagramPreprocessor(use=True,  scalers=[([0,1], MinMaxScaler())])),
         ("NuSeparator",   DiagramPreprocessor(use=False, scalers=[([0, 1], _nu_separator(nu=.1))])),
         ("Padding",       Padding(use=True)),
                           ])
