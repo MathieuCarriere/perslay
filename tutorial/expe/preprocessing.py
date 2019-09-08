@@ -14,22 +14,21 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 #############################################
 
 class BirthPersistenceTransform(BaseEstimator, TransformerMixin):
-
     def __init__(self):
-        pass
+        return None
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
-        return np.matmul(X, np.array([[1., -1.],[0., 1.]]))
+        Xfit = np.matmul(X, np.array([[1., -1.],[0., 1.]]))
+        return Xfit
 
 
 class DiagramPreprocessor(BaseEstimator, TransformerMixin):
-
     def __init__(self, use=False, scalers=[]):
-        self.scalers = scalers
-        self.use     = use
+        self.scalers  = scalers
+        self.use      = use
 
     def fit(self, X, y=None):
         if self.use:
@@ -38,7 +37,7 @@ class DiagramPreprocessor(BaseEstimator, TransformerMixin):
             else:
                 P = np.concatenate(X,0)
             for (indices, scaler) in self.scalers:
-                scaler.fit(P[:,indices])
+                scaler.fit(np.reshape(P[:,indices], [-1, 1]))
         return self
 
     def transform(self, X):
@@ -51,7 +50,6 @@ class DiagramPreprocessor(BaseEstimator, TransformerMixin):
         return Xfit
 
 class Padding(BaseEstimator, TransformerMixin):
-
     def __init__(self, use=False):
         self.use = use
 
@@ -72,14 +70,12 @@ class Padding(BaseEstimator, TransformerMixin):
             Xfit = X
         return Xfit
 
-
 class ProminentPoints(BaseEstimator, TransformerMixin):
-
     def __init__(self, use=False, num_pts=10, threshold=-1, location="upper", point_type="finite"):
-        self.num_pts = num_pts
-        self.threshold = threshold
-        self.use = use
-        self.location = location
+        self.num_pts    = num_pts
+        self.threshold  = threshold
+        self.use        = use
+        self.location   = location
         self.point_type = point_type
 
     def fit(self, X, y=None):
@@ -120,9 +116,7 @@ class ProminentPoints(BaseEstimator, TransformerMixin):
             Xfit = X
         return Xfit
 
-
 class DiagramSelector(BaseEstimator, TransformerMixin):
-
     def __init__(self, use=False, limit=np.inf, point_type="finite"):
         self.use, self.limit, self.point_type = use, limit, point_type
 
@@ -151,7 +145,6 @@ class DiagramSelector(BaseEstimator, TransformerMixin):
         else:
             Xfit = X
         return Xfit
-
 
 # Preprocessing class used in "Deep learning for topological signatures"
 class _nu_separator(BaseEstimator, TransformerMixin):
