@@ -65,12 +65,14 @@ To install this package, run the following instructions in a terminal:
 
 The main repository contains the python file `perslay.py` that defines the PersLay operation and the different types of layers that can be used with it.
 
-It also contains the python notebook `tutorialPersLay.ipynb`, that reproduces the experiments in [1], contains an example of neural network using PersLay that can be used as a template for other experiments, and is hopefully easy to use and self-contained. 
+Moreover, the folder `tutorial` contains the python notebook `tutorialPersLay.ipynb`, that reproduces the experiments in [1], contains an example of neural network using PersLay that can be used as a template for other experiments, and is hopefully easy to use and self-contained. 
 This notebook relies on the aforementioned libraries and on the various functions defined in the files `utils.py`, `preprocessing.py` and `expe.py`.
 The `/data/` repository contains the graph datasets used in the experiments of [1].
 <!--Each sub-repository `DATASET` contains a `.conf` file.--> 
 Graphs datasets (aside the `COLLAB` and `REDDIT` ones, see below) also contains a `/mat/` folder where the different graphs 
 (encoded by their adjacency matrix) are stored (`.mat` files). Orbit datasets are generated on-the-fly.
+
+Finally, you will also find the python notebook `visuPersLay.ipynb` in the `tutorial` folder, which contains examples of PersLay computations on a single persistence diagram. This notebook shows how the usual persistence vectorizations, such as persistence landscapes or images, can be retrieved as special cases of the PersLay architecture. 
 
 
 ### About REDDIT and COLLAB datasets

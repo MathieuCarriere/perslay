@@ -79,7 +79,7 @@ def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
 def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
     bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
-    coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / image_size[i]) for i in range(dimension_before)]
+    coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / (image_size[i]-1)) for i in range(dimension_before)]
     M = tf.meshgrid(*coords)
     mu = tf.concat([tf.expand_dims(tens, 0) for tens in M], axis=0)
     sg = tf.get_variable("s", shape=[1, 1, 1] + [1 for _ in range(dimension_before)], initializer=variance_init) if not variance_const else tf.get_variable("s", initializer=variance_init)
@@ -102,7 +102,7 @@ def perslay(output, name, diag, **kwargs):
     if kwargs["persistence_weight"] == "linear":
         with tf.variable_scope(name + "-linear_pweight"):
             C = tf.get_variable("C", shape=[1], initializer=kwargs["coeff_init"]) if not kwargs["coeff_const"] else tf.get_variable("C", initializer=kwargs["coeff_init"])
-            weight = C * tf.abs(tensor_diag[:, :, 1:2])
+            weight = C * tf.abs(tensor_diag[:, :, 1:2]-tensor_diag[:, :, 0:1])
 
     if kwargs["persistence_weight"] == "grid":
         with tf.variable_scope(name + "-grid_pweight"):
