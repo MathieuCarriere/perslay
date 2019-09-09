@@ -1,24 +1,73 @@
-"""Module :mod:`perskay.expe` provide experimental functions to run perslay."""
+"""Module :mod:`perslay.expe` provide experimental functions to run perslay."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 #          Theo Lacombe <theo.lacombe@inria.fr>
 #          Martin Royer <martin.royer@inria.fr>
 # License: MIT
+
+import datetime
+
 import numpy as np
 import h5py
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import pandas as pd
-import datetime
 
 from six.moves import xrange
 
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import KFold, ShuffleSplit
 
-from preprocessing import preprocess
+from perslay.preprocessing import preprocess
+from perslay.utils import diag_to_dict, _load_config
 
-from utils import _create_batches, _load_config, _diag_to_dict
+
+# notebook utils
+def load_dataset(dataset, verbose=False):
+    # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    path_dataset = "./data/" + dataset + "/"
+    diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
+    filts = list(diagfile.keys())
+    feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
+    diag = diag_to_dict(diagfile, filts=filts)
+
+    # Extract and encode labels with integers
+    L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
+    L = OneHotEncoder(sparse=False, categories="auto").fit_transform(L[:, np.newaxis])
+
+    # Extract features
+    F = np.array(feat)[:, 1:]  # 1: removes the labels
+
+    if verbose:
+        print("Dataset:", dataset)
+        print("Number of observations:", L.shape[0])
+        print("Number of classes:", L.shape[1])
+
+    return diag, F, L
+
+
+def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
+    batch_size = num_tower * tower_size
+    data_num_pts = len(indices)
+    residual = data_num_pts % batch_size
+    nbsplit = int((data_num_pts - residual) / batch_size)
+    split = np.split(np.arange(data_num_pts - residual), nbsplit) if nbsplit > 0 else []
+    # number_of_batches = nbsplit + min(residual, 1)
+    if random:
+        perm = np.random.permutation(data_num_pts)
+    batches = []
+    for i in range(nbsplit):
+        feed_sub = dict()
+        for k in feed_dict.keys():
+            feed_sub[k] = feed_dict[k][perm[split[i]]] if random else feed_dict[k][split[i]]
+        batches.append(feed_sub)
+    if residual > 0:
+        st, sz = data_num_pts - residual, residual - (residual % num_tower)
+        feed_sub = dict()
+        for k in feed_dict.keys():
+            feed_sub[k] = feed_dict[k][perm[np.arange(st, st + sz)]] if random else feed_dict[k][np.arange(st, st + sz)]
+        batches.append(feed_sub)
+    return batches
 
 
 def _evaluate_nn_model(LB, FT, DG,
@@ -259,7 +308,7 @@ def _run_expe(dataset, model, num_run=1):
     filts = list(diagfile.keys())
     # num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
-    diag = _diag_to_dict(diagfile, filts=filts)
+    diag = diag_to_dict(diagfile, filts=filts)
     filts = diag.keys()
 
     # Extract and encode labels with integers
@@ -417,7 +466,7 @@ def single_reproduce(dataset, model):
     filts = list(diagfile.keys())
     # num_filts = len(filts)
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
-    diag = _diag_to_dict(diagfile, filts=filts)
+    diag = diag_to_dict(diagfile, filts=filts)
     # filts = diag.keys()
 
     # Extract and encode labels with integers

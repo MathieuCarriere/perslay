@@ -1,13 +1,15 @@
-"""Module :mod:`perskay.archi` implement the persistence layer."""
+"""Module :mod:`perslay.archi` implement the persistence layer."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 # License: MIT
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+
 
 # Post-processing operation with combination of batch normalization, dropout and relu
 def _post_processing(vector, pro, dropout_value=.9):
@@ -20,8 +22,9 @@ def _post_processing(vector, pro, dropout_value=.9):
             vector = tf.nn.relu(vector)
     return vector
 
-# DeepSet PersLay
+
 def permutation_equivariant_layer(inp, dimension, perm_op, L_init, G_init, bias_init, L_const, G_const, bias_const):
+    """ DeepSet PersLay """
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
     lbda = tf.get_variable("L", shape=[dimension_before, dimension], initializer=L_init)   if not L_const     else tf.get_variable("L", initializer=L_init)
     b    = tf.get_variable("b", shape=[1, 1, dimension], initializer=bias_init)            if not bias_const  else tf.get_variable("b", initializer=bias_init)
@@ -42,8 +45,8 @@ def permutation_equivariant_layer(inp, dimension, perm_op, L_init, G_init, bias_
         return A + b
 
 
-# Gaussian PersLay
 def gaussian_layer(inp, num_gaussians, mean_init, variance_init, mean_const, variance_const):
+    """ Gaussian PersLay """
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
     mu = tf.get_variable("m", shape=[1, 1, dimension_before, num_gaussians], initializer=mean_init)      if not mean_const      else tf.get_variable("m", initializer=mean_init)
     sg = tf.get_variable("s", shape=[1, 1, dimension_before, num_gaussians], initializer=variance_init)  if not variance_const  else tf.get_variable("s", initializer=variance_init)
@@ -51,22 +54,23 @@ def gaussian_layer(inp, num_gaussians, mean_init, variance_init, mean_const, var
     return tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - mu), tf.square(sg)), axis=2))
 
 
-# Landscape PersLay
 def landscape_layer(inp, num_samples, sample_init, sample_const):
+    """ Landscape PersLay """
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
     return tf.maximum( .5 * (inp[:, :, 1:2] - inp[:, :, 0:1]) - tf.abs(sp - .5 * (inp[:, :, 1:2] + inp[:, :, 0:1])), np.array([0]))
 
 
-# Betti PersLay
 def betti_layer(inp, theta, num_samples, sample_init, sample_const):
+    """ Betti PersLay """
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
     X, Y = inp[:, :, 0:1], inp[:, :, 1:2]
     return  1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  )
 
 
-# Entropy PersLay
-# WARNING: this function assumes that padding values are zero
 def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
+    """ Entropy PersLay
+    WARNING: this function assumes that padding values are zero
+    """
     bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
     L, X, Y = bp_inp[:, :, 1:2], bp_inp[:, :, 0:1], bp_inp[:, :, 0:1] + bp_inp[:, :, 1:2]
@@ -75,8 +79,8 @@ def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
     return  tf.multiply(entropy_terms, 1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  ))
 
 
-# Persistence Image PersLay
 def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
+    """ Persistence Image PersLay """
     bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
     coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / (image_size[i]-1)) for i in range(dimension_before)]
@@ -86,10 +90,9 @@ def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
     bc_inp = tf.reshape(bp_inp, [-1, num_pts, dimension_before] + [1 for _ in range(dimension_before)])
     return tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - mu), tf.square(sg)), axis=2))
 
-# PersLay channel for persistence diagrams
-def perslay(output, name, diag, **kwargs):
-            
-    """
+
+def perslay_channel(output, name, diag, **kwargs):
+    """ PersLay channel for persistence diagrams
         output :   list on which perslay output will be appended
         name :     name of the operation for tensorflow
         diag :     big matrix of shape [N_diag, N_pts_per_diag, dimension_diag (coordinates of points) + 1 (mask--0 or 1)]

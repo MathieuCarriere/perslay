@@ -1,17 +1,18 @@
-"""Module :mod:`perskay.preprocessing` implement preprocessing for perslay compatibility."""
+"""Module :mod:`perslay.preprocessing` implement preprocessing for perslay compatibility."""
 
 # Authors: Mathieu Carriere <mathieu.carriere3@gmail.com>
 # License: MIT
-
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+
 #############################################
 # Preprocessing #############################
 #############################################
+
 
 class BirthPersistenceTransform(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -48,6 +49,7 @@ class DiagramPreprocessor(BaseEstimator, TransformerMixin):
                     for (indices, scaler) in self.scalers:
                         Xfit[i][:,indices] = scaler.transform(Xfit[i][:,indices])
         return Xfit
+
 
 class Padding(BaseEstimator, TransformerMixin):
     def __init__(self, use=False):
@@ -146,8 +148,9 @@ class DiagramSelector(BaseEstimator, TransformerMixin):
             Xfit = X
         return Xfit
 
-# Preprocessing class used in "Deep learning for topological signatures"
-class _nu_separator(BaseEstimator, TransformerMixin):
+
+class nu_separator(BaseEstimator, TransformerMixin):
+    """ Preprocessing class used in "Deep learning for topological signatures """
     def __init__(self, nu=0.1):
         self.nu = nu
 
@@ -170,7 +173,7 @@ def preprocess(diag, thresh=500):
         ("Selector",      DiagramSelector(use=True, point_type="finite")),
         ("ProminentPts",  ProminentPoints(use=True, num_pts=400, point_type="finite")),
         ("Scaler",        DiagramPreprocessor(use=True,  scalers=[([0,1], MinMaxScaler())])),
-        ("NuSeparator",   DiagramPreprocessor(use=False, scalers=[([0, 1], _nu_separator(nu=.1))])),
+        ("NuSeparator",   DiagramPreprocessor(use=False, scalers=[([0, 1], nu_separator(nu=.1))])),
         ("Padding",       Padding(use=True)),
                           ])
     prm = {filt: {"ProminentPts__num_pts": min(thresh, max([len(dgm) for dgm in diag[filt]]))} for filt in filts if
