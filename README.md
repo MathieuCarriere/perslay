@@ -1,5 +1,7 @@
 # PersLay: A Simple and Versatile Neural Network Layer for Persistence Diagrams
 
+__Authors:__  Mathieu Carriere, Theo Lacombe, Martin Royer
+
 __Note:__ This is an alpha version of PersLay. 
 Feel free to contact the authors for any remark, suggestion, bug, etc.
 
