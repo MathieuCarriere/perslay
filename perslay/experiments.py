@@ -205,7 +205,6 @@ def _evaluate_nn_model(LB, FT, DG,
 
     with tf.device("/cpu:0"):
         num_pts, num_labels, num_features, num_filt = LB.shape[0], LB.shape[1], FT.shape[1], len(DG)
-
         # Neural network input
         indxs = tf.placeholder(shape=[None, 1], dtype=tf.int32)
         label = tf.placeholder(shape=[None, num_labels], dtype=tf.float32)
@@ -433,8 +432,7 @@ def _run_expe(dataset, model, num_run=1, path_dataset=""):
 
     # load precalculated feats and diagrams and labels
     diag, feats, labels = load_diagfeatlabels(dataset, path_dataset=path_dataset, verbose=verbose)
-    filts = diag.keys()
-    diags = preprocess(diag)
+    diags, filts = preprocess(diag)
 
     instance_model = model
     # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
@@ -578,7 +576,7 @@ def single_reproduce(dataset, model, path_dataset=""):
 
     # load precalculated feats and diagrams and labels
     diag, feats, labels = load_diagfeatlabels(dataset, path_dataset=path_dataset, verbose=verbose)
-    diags = preprocess(diag)
+    diags, filts = preprocess(diag)
 
     # Train and test data.
     folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
@@ -702,14 +700,10 @@ def single_run(diags, feats, labels,
         plt.show()
 
         if visualize_weight:
-
-            filts = list(list_filtrations) #[k for k in list_filtrations.keys()]
             if model.get_parameters()["persistence_weight"] == "grid":
-
                 fig = plt.figure(figsize=(10,20))
 
                 for nf in range(model.num_filts):
-
                     plt.subplot(model.num_filts,2,2*nf+1)
                     plt.imshow(weights[nf][0], cmap="Purples",  vmin=kwargs["gmin"], vmax=kwargs["gmax"])
                     plt.title(filts[nf] + " -- before training")
@@ -723,7 +717,6 @@ def single_run(diags, feats, labels,
                 plt.show()
 
             if model.get_parameters()["persistence_weight"] == "gmix":
-
                 x = np.arange(kwargs["xmin"], kwargs["xmax"], kwargs["xstep"])
                 y = np.arange(kwargs["ymin"], kwargs["ymax"], kwargs["ystep"])
                 xx, yy = np.meshgrid(x, y)
