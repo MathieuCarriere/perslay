@@ -9,6 +9,8 @@ import os.path
 import itertools
 import h5py
 
+from ast import literal_eval
+
 from scipy.sparse import csgraph
 from scipy.io import loadmat, savemat
 from scipy.linalg import eigh
@@ -28,11 +30,26 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import KFold, ShuffleSplit
 
 from perslay.preprocessing import preprocess
-from perslay.utils import diag_to_dict, load_config, hks_signature, get_base_simplex, apply_graph_extended_persistence
+from perslay.utils import diag_to_dict, hks_signature, get_base_simplex, apply_graph_extended_persistence
+
+
+def load_config(filepath):
+    with open(filepath, "r") as fp:
+        lines = fp.readlines()
+        dataset_type = lines[0][:-1]
+        list_filtrations = literal_eval(lines[1])
+        thresh = int(lines[2])
+        perslay_parameters = literal_eval(lines[3])
+        optim_parameters = literal_eval(lines[4])
+    return dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters
 
 
 # filtrations and features generation for datasets in the paper
-def generate_diag_and_features(dataset):
+def generate_diag_and_features(dataset, path_dataset=""):
+    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
+    filepath = path_dataset + dataset + ".conf"
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
+
     if "REDDIT" in dataset:
         print("Unfortunately, REDDIT data are not available yet for memory issues.\n")
         print("Moreover, the link we used to download the data,")
@@ -40,14 +57,12 @@ def generate_diag_and_features(dataset):
         print("is down at the commit time (May 23rd).")
         print("We will update this repository when we figure out a workaround.")
         return
-
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
-    path_dataset = "data/" + dataset + "/"
+    # if "REDDIT" in dataset:
+    #     _prepreprocess_reddit(dataset)
     if os.path.isfile(path_dataset + dataset + ".hdf5"):
         os.remove(path_dataset + dataset + ".hdf5")
     diag_file = h5py.File(path_dataset + dataset + ".hdf5")
-    # if "REDDIT" in dataset:
-    #     _prepreprocess_reddit(dataset)
+
     if dataset_type == "graph":
         persist_types = ["Ord0", "Rel1", "Ext0", "Ext1"]
         [diag_file.create_group(persist_type + "_" + str(filtration))
@@ -129,14 +144,14 @@ def generate_diag_and_features(dataset):
         labels = pd.DataFrame(labs)
         labels.set_index("pcid")
         features = labels[["label"]]
+
     features.to_csv(path_dataset + dataset + ".csv")
     return diag_file.close()
 
 
 # notebook utils
-def load_dataset(dataset, verbose=False):
-    # dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
-    path_dataset = "./data/" + dataset + "/"
+def load_diagfeatlabels(dataset, path_dataset="", verbose=False):
+    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
     filts = list(diagfile.keys())
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
@@ -153,7 +168,6 @@ def load_dataset(dataset, verbose=False):
         print("Dataset:", dataset)
         print("Number of observations:", L.shape[0])
         print("Number of classes:", L.shape[1])
-
     return diag, F, L
 
 
@@ -381,8 +395,10 @@ def _evaluate_nn_model(LB, FT, DG,
     return list_train_accs, list_valid_accs, list_test_accs, weights
 
 
-def _run_expe(dataset, model, num_run=1):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
+def _run_expe(dataset, model, num_run=1, path_dataset=""):
+    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
+    filepath = path_dataset + dataset + ".conf"
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
     # Train and test data
     # In this subsection, we finally train and test the network on the data.
     #
@@ -415,25 +431,10 @@ def _run_expe(dataset, model, num_run=1):
     learn_rate = optim_parameters["lr"]  # Learning rate of optimizer
     verbose = True
 
-    path_dataset = "./data/" + dataset + "/"
-    diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
-    filts = list(diagfile.keys())
-    # num_filts = len(filts)
-    feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
-    diag = diag_to_dict(diagfile, filts=filts)
+    # load precalculated feats and diagrams and labels
+    diag, feats, labels = load_diagfeatlabels(dataset, path_dataset=path_dataset, verbose=verbose)
     filts = diag.keys()
-
-    # Extract and encode labels with integers
-    L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
-    L = OneHotEncoder(sparse=False, categories="auto").fit_transform(L[:, np.newaxis])
-
-    # Extract features
-    F = np.array(feat)[:, 1:]   # 1: removes the labels
-
     diags = preprocess(diag)
-    # diags = D_pad
-    feats = F
-    labels = L
 
     instance_model = model
     # partial(_model, parameters=perslay_parameters, num_filts=num_filts, num_labels=labels.shape[1], withdiag=withdiag)
@@ -503,8 +504,10 @@ def _run_expe(dataset, model, num_run=1):
     return
 
 
-def single_reproduce(dataset, model):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
+def single_reproduce(dataset, model, path_dataset=""):
+    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
+    filepath = path_dataset + dataset + ".conf"
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
     # Train and test data
     # mode = "RP"  # Either "KF" or "RP"
     num_folds = 1  # Number of splits
@@ -573,24 +576,9 @@ def single_reproduce(dataset, model):
     learn_rate = optim_parameters["lr"]  # Learning rate of optimizer
     verbose = True
 
-    path_dataset = "./data/" + dataset + "/"
-    diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
-    filts = list(diagfile.keys())
-    # num_filts = len(filts)
-    feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
-    diag = diag_to_dict(diagfile, filts=filts)
-    # filts = diag.keys()
-
-    # Extract and encode labels with integers
-    L = np.array(LabelEncoder().fit_transform(np.array(feat["label"])))
-    L = OneHotEncoder(sparse=False, categories="auto").fit_transform(L[:, np.newaxis])
-
-    # Extract features
-    F = np.array(feat)[:, 1:]   # 1: removes the labels
-
+    # load precalculated feats and diagrams and labels
+    diag, feats, labels = load_diagfeatlabels(dataset, path_dataset=path_dataset, verbose=verbose)
     diags = preprocess(diag)
-    feats = F
-    labels = L
 
     # Train and test data.
     folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
@@ -766,8 +754,10 @@ def single_run(diags, feats, labels,
     return
 
 
-def perform_expe(dataset, model):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
+def perform_expe(dataset, model, path_dataset=""):
+    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
+    filepath = path_dataset + dataset + ".conf"
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
     if dataset_type == "graph":
         _run_expe(dataset, model, num_run=10)
     elif dataset_type == "orbit":

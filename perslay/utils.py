@@ -8,22 +8,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from ast import literal_eval
-
 import numpy as np
 import gudhi as gd
-
-
-def load_config(dataset):
-    filepath = "./data/" + dataset + "/" + dataset + ".conf"
-    with open(filepath) as fp:
-        lines = fp.readlines()
-        dataset_type = lines[0][:-1]
-        list_filtrations = literal_eval(lines[1])
-        thresh = int(lines[2])
-        perslay_parameters = literal_eval(lines[3])
-        optim_parameters = literal_eval(lines[4])
-    return dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters
 
 
 # Input utility functions for persistence diagrams
