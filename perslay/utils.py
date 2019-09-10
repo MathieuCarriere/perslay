@@ -8,23 +8,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os.path
-import itertools
-import h5py
-
 from ast import literal_eval
-
-from scipy.sparse import csgraph
-from scipy.io import loadmat, savemat
-from scipy.linalg import eigh
 
 import numpy as np
 import gudhi as gd
 
-import pandas as pd
 
-
-def _load_config(dataset):
+def load_config(dataset):
     filepath = "./data/" + dataset + "/" + dataset + ".conf"
     with open(filepath) as fp:
         lines = fp.readlines()
@@ -61,6 +51,7 @@ def get_base_simplex(A):
     return st.get_filtration()
 
 
+# graph utils
 def hks_signature(eigenvectors, eigenvals, time):
     return np.square(eigenvectors).dot(np.diag(np.exp(-time * eigenvals))).sum(axis=1)
 
@@ -143,105 +134,3 @@ def apply_graph_extended_persistence(A, filtration_val, basesimplex):
     if dgmRel1.shape[0] == 0:
         dgmRel1 = np.zeros([0, 2])
     return dgmOrd0, dgmExt0, dgmRel1, dgmExt1
-
-
-def generate_diag_and_features(dataset):
-    if "REDDIT" in dataset:
-        print("Unfortunately, REDDIT data are not available yet for memory issues.\n")
-        print("Moreover, the link we used to download the data,")
-        print("http://www.mit.edu/~pinary/kdd/datasets.tar.gz")
-        print("is down at the commit time (May 23rd).")
-        print("We will update this repository when we figure out a workaround.")
-        return
-
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
-    path_dataset = "data/" + dataset + "/"
-    if os.path.isfile(path_dataset + dataset + ".hdf5"):
-        os.remove(path_dataset + dataset + ".hdf5")
-    diag_file = h5py.File(path_dataset + dataset + ".hdf5")
-    # if "REDDIT" in dataset:
-    #     _prepreprocess_reddit(dataset)
-    if dataset_type == "graph":
-        [diag_file.create_group(filtration_type + "_" + str(filtration))
-         for filtration, filtration_type in itertools.product(list_filtrations, ["Ord0", "Rel1", "Ext0", "Ext1"])]
-
-        # preprocessing
-        pad_size = 1
-        for graph_name in os.listdir(path_dataset + "mat/"):
-            A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
-            pad_size = np.max((A.shape[0], pad_size))
-
-        features = pd.DataFrame(index=range(len(os.listdir(path_dataset + "mat/"))),
-                                columns=["label"] +
-                                        ["eval" + str(i) for i in range(pad_size)] +
-                                        [name + "-percent" + str(i) for name, i in
-                                         itertools.product([f for f in list_filtrations if "hks" in f],
-                                                           10 * np.arange(11))])
-
-        for idx, graph_name in enumerate((os.listdir(path_dataset + "mat/"))):
-            name = graph_name.split("_")
-            gid = int(name[name.index("gid") + 1]) - 1
-            A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
-            num_vertices = A.shape[0]
-            label = int(name[name.index("lb") + 1])
-            L = csgraph.laplacian(A, normed=True)
-            egvals, egvectors = eigh(L)
-            basesimplex = get_base_simplex(A)
-
-            eigenvectors = np.zeros([num_vertices, pad_size])
-            eigenvals = np.zeros(pad_size)
-            eigenvals[:min(pad_size, num_vertices)] = np.flipud(egvals)[:min(pad_size, num_vertices)]
-            eigenvectors[:, :min(pad_size, num_vertices)] = np.fliplr(egvectors)[:, :min(pad_size, num_vertices)]
-            graph_features = []
-            graph_features.append(eigenvals)
-
-            for filtration in list_filtrations:
-                # persistence
-                hks_time = float(filtration.split("-")[0])
-                filtration_val = hks_signature(egvectors, egvals, time=hks_time)
-                dgmOrd0, dgmExt0, dgmRel1, dgmExt1 = apply_graph_extended_persistence(A, filtration_val, basesimplex)
-                diag_file["Ord0_" + filtration].create_dataset(name=str(gid), data=dgmOrd0)
-                diag_file["Ext0_" + filtration].create_dataset(name=str(gid), data=dgmExt0)
-                diag_file["Rel1_" + filtration].create_dataset(name=str(gid), data=dgmRel1)
-                diag_file["Ext1_" + filtration].create_dataset(name=str(gid), data=dgmExt1)
-                # features
-                graph_features.append(np.percentile(hks_signature(eigenvectors, eigenvals, time=hks_time),
-                                                    10 * np.arange(11)))
-            features.loc[gid] = np.insert(np.concatenate(graph_features), 0, label)
-        features['label'] = features['label'].astype(int)
-
-    elif dataset_type == "orbit":
-        [diag_file.create_group(_) for _ in ["Alpha0", "Alpha1"]]
-        labs = []
-        count = 0
-        num_diag_per_param = 1000 if "5K" in dataset else 20000
-        num_pts_per_orbit = 1000
-        for lab, r in enumerate([2.5, 3.5, 4.0, 4.1, 4.3]):
-            print("Generating", num_diag_per_param, "orbits and diagrams for r = ", r, "...")
-            for dg in range(num_diag_per_param):
-                x0, y0 = np.random.rand(), np.random.rand()
-                xcur, ycur = x0, y0
-                X = np.zeros([num_pts_per_orbit, 2])
-                X[0, :] = [x0, y0]
-                for idx in range(num_pts_per_orbit - 1):
-                    xcur += r * ycur * (1. - ycur)
-                    xcur -= int(xcur)
-                    ycur += r * xcur * (1. - xcur)
-                    ycur -= int(ycur)
-                    X[idx, :] = [xcur, ycur]
-
-                alpha_complex = gd.AlphaComplex(points=X)
-                simplex_tree = alpha_complex.create_simplex_tree(max_alpha_square=1e50)
-                simplex_tree.persistence()
-                diag_file["Alpha0"].create_dataset(name=str(count),
-                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(0)))
-                diag_file["Alpha1"].create_dataset(name=str(count),
-                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(1)))
-                orbit_label = {"label": lab, "pcid": count}
-                labs.append(orbit_label)
-                count += 1
-        labels = pd.DataFrame(labs)
-        labels.set_index("pcid")
-        features = labels[["label"]]
-    features.to_csv(path_dataset + dataset + ".csv")
-    return diag_file.close()

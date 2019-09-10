@@ -5,11 +5,20 @@
 #          Martin Royer <martin.royer@inria.fr>
 # License: MIT
 
+import os.path
+import itertools
+import h5py
+
+from scipy.sparse import csgraph
+from scipy.io import loadmat, savemat
+from scipy.linalg import eigh
+
 import datetime
 
 import numpy as np
-import h5py
 import tensorflow as tf
+import gudhi as gd
+
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -19,7 +28,109 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import KFold, ShuffleSplit
 
 from perslay.preprocessing import preprocess
-from perslay.utils import diag_to_dict, _load_config
+from perslay.utils import diag_to_dict, load_config, hks_signature, get_base_simplex, apply_graph_extended_persistence
+
+
+# filtrations and features generation for datasets in the paper
+def generate_diag_and_features(dataset):
+    if "REDDIT" in dataset:
+        print("Unfortunately, REDDIT data are not available yet for memory issues.\n")
+        print("Moreover, the link we used to download the data,")
+        print("http://www.mit.edu/~pinary/kdd/datasets.tar.gz")
+        print("is down at the commit time (May 23rd).")
+        print("We will update this repository when we figure out a workaround.")
+        return
+
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
+    path_dataset = "data/" + dataset + "/"
+    if os.path.isfile(path_dataset + dataset + ".hdf5"):
+        os.remove(path_dataset + dataset + ".hdf5")
+    diag_file = h5py.File(path_dataset + dataset + ".hdf5")
+    # if "REDDIT" in dataset:
+    #     _prepreprocess_reddit(dataset)
+    if dataset_type == "graph":
+        persist_types = ["Ord0", "Rel1", "Ext0", "Ext1"]
+        [diag_file.create_group(persist_type + "_" + str(filtration))
+         for filtration, persist_type in itertools.product(list_filtrations, persist_types)]
+
+        # preprocessing
+        pad_size = 1
+        for graph_name in os.listdir(path_dataset + "mat/"):
+            A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
+            pad_size = np.max((A.shape[0], pad_size))
+
+        features = pd.DataFrame(index=range(len(os.listdir(path_dataset + "mat/"))),
+                                columns=["label"] +
+                                        ["eval" + str(i) for i in range(pad_size)] +
+                                        [name + "-percent" + str(i) for name, i in
+                                         itertools.product([f for f in list_filtrations if "hks" in f],
+                                                           10 * np.arange(11))])
+
+        for idx, graph_name in enumerate((os.listdir(path_dataset + "mat/"))):
+            name = graph_name.split("_")
+            gid = int(name[name.index("gid") + 1]) - 1
+            A = np.array(loadmat(path_dataset + "mat/" + graph_name)["A"], dtype=np.float32)
+            num_vertices = A.shape[0]
+            label = int(name[name.index("lb") + 1])
+            L = csgraph.laplacian(A, normed=True)
+            egvals, egvectors = eigh(L)
+            basesimplex = get_base_simplex(A)
+
+            eigenvectors = np.zeros([num_vertices, pad_size])
+            eigenvals = np.zeros(pad_size)
+            eigenvals[:min(pad_size, num_vertices)] = np.flipud(egvals)[:min(pad_size, num_vertices)]
+            eigenvectors[:, :min(pad_size, num_vertices)] = np.fliplr(egvectors)[:, :min(pad_size, num_vertices)]
+            graph_features = []
+            graph_features.append(eigenvals)
+
+            for filtration in list_filtrations:
+                # persistence
+                hks_time = float(filtration.split("-")[0])
+                filtration_val = hks_signature(egvectors, egvals, time=hks_time)
+                dgmOrd0, dgmExt0, dgmRel1, dgmExt1 = apply_graph_extended_persistence(A, filtration_val, basesimplex)
+                diag_file["Ord0_" + filtration].create_dataset(name=str(gid), data=dgmOrd0)
+                diag_file["Ext0_" + filtration].create_dataset(name=str(gid), data=dgmExt0)
+                diag_file["Rel1_" + filtration].create_dataset(name=str(gid), data=dgmRel1)
+                diag_file["Ext1_" + filtration].create_dataset(name=str(gid), data=dgmExt1)
+                # features
+                graph_features.append(np.percentile(hks_signature(eigenvectors, eigenvals, time=hks_time),
+                                                    10 * np.arange(11)))
+            features.loc[gid] = np.insert(np.concatenate(graph_features), 0, label)
+        features['label'] = features['label'].astype(int)
+
+    elif dataset_type == "orbit":
+        def _gen_orbit(num_pts_per_orbit, param):
+            X = np.zeros([num_pts_per_orbit, 2])
+            xcur, ycur = np.random.rand(), np.random.rand()
+            for idx in range(num_pts_per_orbit):
+                xcur = (xcur + param * ycur * (1. - ycur)) % 1
+                ycur = (ycur + param * xcur * (1. - xcur)) % 1
+                X[idx, :] = [xcur, ycur]
+            return X
+
+        [diag_file.create_group(_) for _ in ["Alpha0", "Alpha1"]]
+        labs = []
+        count = 0
+        num_diag_per_param = 1000 if "5K" in dataset else 20000
+        for lab, r in enumerate([2.5, 3.5, 4.0, 4.1, 4.3]):
+            print("Generating", num_diag_per_param, "orbits and diagrams for r = ", r, "...")
+            for dg in range(num_diag_per_param):
+                X = _gen_orbit(num_pts_per_orbit=1000, param=r)
+                alpha_complex = gd.AlphaComplex(points=X)
+                simplex_tree = alpha_complex.create_simplex_tree(max_alpha_square=1e50)
+                simplex_tree.persistence()
+                diag_file["Alpha0"].create_dataset(name=str(count),
+                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(0)))
+                diag_file["Alpha1"].create_dataset(name=str(count),
+                                                   data=np.array(simplex_tree.persistence_intervals_in_dimension(1)))
+                orbit_label = {"label": lab, "pcid": count}
+                labs.append(orbit_label)
+                count += 1
+        labels = pd.DataFrame(labs)
+        labels.set_index("pcid")
+        features = labels[["label"]]
+    features.to_csv(path_dataset + dataset + ".csv")
+    return diag_file.close()
 
 
 # notebook utils
@@ -46,6 +157,7 @@ def load_dataset(dataset, verbose=False):
     return diag, F, L
 
 
+# learning utils
 def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
     batch_size = num_tower * tower_size
     data_num_pts = len(indices)
@@ -270,7 +382,7 @@ def _evaluate_nn_model(LB, FT, DG,
 
 
 def _run_expe(dataset, model, num_run=1):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
     # Train and test data
     # In this subsection, we finally train and test the network on the data.
     #
@@ -392,7 +504,7 @@ def _run_expe(dataset, model, num_run=1):
 
 
 def single_reproduce(dataset, model):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
     # Train and test data
     # mode = "RP"  # Either "KF" or "RP"
     num_folds = 1  # Number of splits
@@ -655,7 +767,7 @@ def single_run(diags, feats, labels,
 
 
 def perform_expe(dataset, model):
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = _load_config(dataset=dataset)
+    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(dataset=dataset)
     if dataset_type == "graph":
         _run_expe(dataset, model, num_run=10)
     elif dataset_type == "orbit":
