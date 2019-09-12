@@ -22,7 +22,7 @@ def _post_processing(vector, pro, dropout_value=.9):
             vector = tf.nn.relu(vector)
     return vector
 
-
+# Vectorization implementing DeepSet architecture
 def permutation_equivariant_layer(inp, dimension, perm_op, L_init, G_init, bias_init, L_const, G_const, bias_const):
     """ DeepSet PersLay """
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
@@ -44,29 +44,47 @@ def permutation_equivariant_layer(inp, dimension, perm_op, L_init, G_init, bias_
     else:
         return A + b
 
-
-def gaussian_layer(inp, num_gaussians, mean_init, variance_init, mean_const, variance_const):
-    """ Gaussian PersLay """
+# Vectorizations taken from "Learning Representations of Persistence Barcodes"
+def rational_hat_layer(inp, num_elements, q, mean_init, r_init, mean_const, r_const):
+    """ Rational Hat PersLay """
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
-    mu = tf.get_variable("m", shape=[1, 1, dimension_before, num_gaussians], initializer=mean_init)      if not mean_const      else tf.get_variable("m", initializer=mean_init)
-    sg = tf.get_variable("s", shape=[1, 1, dimension_before, num_gaussians], initializer=variance_init)  if not variance_const  else tf.get_variable("s", initializer=variance_init)
+    mu = tf.get_variable("m", shape=[1, 1, dimension_before, num_elements], initializer=mean_init)      if not mean_const      else tf.get_variable("m", initializer=mean_init)
+    r  = tf.get_variable("r", shape=[1, 1, 1],                              initializer=r_init)         if not r_const         else tf.get_variable("r", initializer=r_init)
+    bc_inp = tf.expand_dims(inp, -1)
+    norms = tf.norm(bc_inp - mu, ord=q, axis=2)
+    return 1/(1 + norms) - 1/(1 + tf.abs(tf.abs(r)-norms)) 
+
+def rational_layer(inp, num_elements, mean_init, variance_init, alpha_init, mean_const, variance_const, alpha_const):
+    """ Rational PersLay """
+    dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
+    mu = tf.get_variable("m", shape=[1, 1, dimension_before, num_elements], initializer=mean_init)      if not mean_const      else tf.get_variable("m", initializer=mean_init)
+    sg = tf.get_variable("s", shape=[1, 1, dimension_before, num_elements], initializer=variance_init)  if not variance_const  else tf.get_variable("s", initializer=variance_init)
+    al = tf.get_variable("a", shape=[1, 1, num_elements],                   initializer=alpha_init)     if not alpha_const     else tf.get_variable("a", initializer=alpha_init)
+    bc_inp = tf.expand_dims(inp, -1)
+    return 1/tf.pow(1+tf.reduce_sum(tf.multiply(tf.abs(bc_inp - mu), tf.abs(sg)), axis=2), al)
+
+def exponential_layer(inp, num_elements, mean_init, variance_init, mean_const, variance_const):
+    """ Exponential PersLay """
+    dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
+    mu = tf.get_variable("m", shape=[1, 1, dimension_before, num_elements], initializer=mean_init)      if not mean_const      else tf.get_variable("m", initializer=mean_init)
+    sg = tf.get_variable("s", shape=[1, 1, dimension_before, num_elements], initializer=variance_init)  if not variance_const  else tf.get_variable("s", initializer=variance_init)
     bc_inp = tf.expand_dims(inp, -1)
     return tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - mu), tf.square(sg)), axis=2))
 
-
+# Vectorizations implementing persistence landscapes
 def landscape_layer(inp, num_samples, sample_init, sample_const):
     """ Landscape PersLay """
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
     return tf.maximum( .5 * (inp[:, :, 1:2] - inp[:, :, 0:1]) - tf.abs(sp - .5 * (inp[:, :, 1:2] + inp[:, :, 0:1])), np.array([0]))
 
-
+# Vectorizations implementing Betti curves
 def betti_layer(inp, theta, num_samples, sample_init, sample_const):
     """ Betti PersLay """
     sp = tf.get_variable("s", shape=[1, 1, num_samples], initializer=sample_init) if not sample_const else tf.get_variable("s", initializer=sample_init)
     X, Y = inp[:, :, 0:1], inp[:, :, 1:2]
     return  1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  )
 
-
+# Vectorizations implementing persistence entropy
 def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
     """ Entropy PersLay
     WARNING: this function assumes that padding values are zero
@@ -78,7 +96,7 @@ def entropy_layer(inp, theta, num_samples, sample_init, sample_const):
     entropy_terms = tf.where(LN > 0., -tf.multiply(LN, tf.log(LN)), LN)
     return  tf.multiply(entropy_terms, 1. / ( 1. + tf.exp( -theta * (.5*(Y-X) - tf.abs(sp - .5*(Y+X))) )  ))
 
-
+# Vectorizations implementing persistence images
 def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
     """ Persistence Image PersLay """
     bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
@@ -130,9 +148,6 @@ def perslay_channel(output, name, diag, **kwargs):
         for idx, (dim, pop) in enumerate(kwargs["peq"]):
             with tf.variable_scope(name + "-perm_eq-" + str(idx)):
                 tensor_diag = permutation_equivariant_layer(tensor_diag, dim, pop, kwargs["weight_init"], kwargs["weight_init"], kwargs["bias_init"], kwargs["weight_const"], kwargs["weight_const"], kwargs["bias_const"])
-    elif kwargs["layer"] == "gs":  # Channel with gaussian layer
-        with tf.variable_scope(name + "-gaussians"):
-            tensor_diag = gaussian_layer(tensor_diag, kwargs["num_gaussians"], kwargs["mean_init"], kwargs["variance_init"], kwargs["mean_const"], kwargs["variance_const"])
     elif kwargs["layer"] == "ls":  # Channel with landscape layer
         with tf.variable_scope(name + "-samples"):
             tensor_diag = landscape_layer(tensor_diag, kwargs["num_samples"], kwargs["sample_init"], kwargs["sample_const"])
@@ -145,6 +160,15 @@ def perslay_channel(output, name, diag, **kwargs):
     elif kwargs["layer"] == "im":  # Channel with image layer
         with tf.variable_scope(name + "-bandwidth"):
             tensor_diag = image_layer(tensor_diag, kwargs["image_size"], kwargs["image_bnds"], kwargs["variance_init"], kwargs["variance_const"])
+    elif kwargs["layer"] == "ex":  # Channel with exponential layer
+        with tf.variable_scope(name + "-gaussians"):
+            tensor_diag = exponential_layer(tensor_diag, kwargs["num_elements"], kwargs["mean_init"], kwargs["variance_init"], kwargs["mean_const"], kwargs["variance_const"])
+    elif kwargs["layer"] == "rt":  # Channel with rational layer
+        with tf.variable_scope(name + "-bandwidth"):
+            tensor_diag = rational_layer(tensor_diag, kwargs["num_elements"], kwargs["mean_init"], kwargs["variance_init"], kwargs["alpha_init"], kwargs["mean_const"], kwargs["variance_const"], kwargs["alpha_const"])
+    elif kwargs["layer"] == "rh":  # Channel with rational hat layer
+        with tf.variable_scope(name + "-bandwidth"):
+            tensor_diag = rational_hat_layer(tensor_diag, kwargs["num_elements"], kwargs["q"], kwargs["mean_init"], kwargs["r_init"], kwargs["mean_const"], kwargs["r_const"])
 
     output_dim = len(tensor_diag.shape) - 2
 

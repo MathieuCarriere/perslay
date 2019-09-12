@@ -637,8 +637,15 @@ def single_run(diags, feats, labels,
     elif layer == "ls" or layer == "bc" or layer == "en":
         print("  number of samples:",                  perslay_parameters["num_samples"])
         print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "gs":
-        print("  number of Gaussians:",                perslay_parameters["num_gaussians"])
+    elif layer == "ex":
+        print("  number of elements:",                 perslay_parameters["num_elements"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "rt":
+        print("  number of elements:",                 perslay_parameters["num_elements"])
+        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+    elif layer == "rh":
+        print("  number of elements:",                 perslay_parameters["num_elements"])
+        print("  norm:",                               perslay_parameters["q"])
         print("  fully-connected operations:",         perslay_parameters["fc_layers"])
     
     print("Weight function:",                          perslay_parameters["persistence_weight"])
