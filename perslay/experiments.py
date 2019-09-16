@@ -709,15 +709,15 @@ def single_run(diags, feats, labels,
         if visualize_weight:
             if model.get_parameters()["persistence_weight"] == "grid":
                 fig = plt.figure(figsize=(10,20))
-
+                filts = list(list_filtrations)
                 for nf in range(model.num_filts):
                     plt.subplot(model.num_filts,2,2*nf+1)
-                    plt.imshow(weights[nf][0], cmap="Purples",  vmin=kwargs["gmin"], vmax=kwargs["gmax"])
+                    plt.imshow(weights[nf][0], cmap="Purples",  vmin=kwargs["xmin"], vmax=kwargs["xmax"])
                     plt.title(filts[nf] + " -- before training")
                     plt.colorbar()
 
                     plt.subplot(model.num_filts,2,2*(nf+1))
-                    plt.imshow(weights[nf][-1], cmap="Purples", vmin=kwargs["gmin"], vmax=kwargs["gmax"])
+                    plt.imshow(weights[nf][-1], cmap="Purples", vmin=kwargs["xmin"], vmax=kwargs["xmax"])
                     plt.title(filts[nf] + " -- after training")
                     plt.colorbar()
 
