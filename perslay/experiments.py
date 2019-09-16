@@ -394,7 +394,7 @@ def _evaluate_nn_model(LB, FT, DG,
     return list_train_accs, list_valid_accs, list_test_accs, weights
 
 
-def _run_expe(dataset, model, num_run=1, path_dataset=""):
+def perform_expe(dataset, model, num_run=1, path_dataset=""):
     path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
     filepath = path_dataset + dataset + ".conf"
     dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
@@ -502,109 +502,45 @@ def _run_expe(dataset, model, num_run=1, path_dataset=""):
     return
 
 
-def single_reproduce(dataset, model, path_dataset=""):
-    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
-    filepath = path_dataset + dataset + ".conf"
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
-    # Train and test data
-    # mode = "RP"  # Either "KF" or "RP"
-    num_folds = 1  # Number of splits
-    # num_run = 1
-    test_size = 0.1
-    if dataset_type == "graph":
-        test_size = 0.1  # Size of test set
-    elif dataset_type == "orbit":
-        test_size = 0.3  # Size of test set
-
-    print("Doing a single run on the dataset: " + dataset + " with a "
-          + str(int(100 * (1-test_size))) + "-" + str(int(100 * test_size))+" split.")
-
+def _print_info(filtrations, thresh, perslay_parameters, optim_parameters):
     print("Filtrations used:")
-    print(list_filtrations)
+    print(filtrations)
     print("Thresholding in diagrams:", thresh)
 
     print(" ***** PersLay parameters: *****")
-    print("Layer:",                                  perslay_parameters["layer"])
+    print("Layer:", perslay_parameters["layer"])
     layer = perslay_parameters["layer"]
     if layer == "im":
-        print("  image size:",                         perslay_parameters["image_size"])
-        print("  image boundaries:",                   perslay_parameters["image_bnds"])
-        print("  convolution operations:",             perslay_parameters["cv_layers"])
+        print("  image size:", perslay_parameters["image_size"])
+        print("  image boundaries:", perslay_parameters["image_bnds"])
+        print("  convolution operations:", perslay_parameters["cv_layers"])
     elif layer == "pm":
         print("  permutation equivariant operations:", perslay_parameters["peq"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+        print("  fully-connected operations:", perslay_parameters["fc_layers"])
     elif layer == "ls":
-        print("  number of samples:",                  perslay_parameters["num_samples"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
+        print("  number of samples:", perslay_parameters["num_samples"])
+        print("  fully-connected operations:", perslay_parameters["fc_layers"])
     elif layer == "gs":
-        print("  number of Gaussians:",                perslay_parameters["num_gaussians"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    
-    print("Weight function:",                          perslay_parameters["persistence_weight"])
+        print("  number of Gaussians:", perslay_parameters["num_gaussians"])
+        print("  fully-connected operations:", perslay_parameters["fc_layers"])
+
+    print("Weight function:", perslay_parameters["persistence_weight"])
     weight = perslay_parameters["persistence_weight"]
     if weight == "grid":
-        print("  grid size:",                          perslay_parameters["grid_size"])
-        print("  grid boundaries:" ,                   perslay_parameters["grid_bnds"])
+        print("  grid size:", perslay_parameters["grid_size"])
+        print("  grid boundaries:", perslay_parameters["grid_bnds"])
 
-    print("Permutation invariant operation:",          perslay_parameters["perm_op"])
+    print("Permutation invariant operation:", perslay_parameters["perm_op"])
     pop = perslay_parameters["perm_op"]
     if pop == "topk":
-        print("  number of largest values",            perslay_parameters["keep"]) 
+        print("  number of largest values", perslay_parameters["keep"])
 
     print("***** Optimization parameters *****")
-    print("Optimizer:",          "ADAM")
-    print("Number of epochs:",   optim_parameters["num_epoch"])
-    print("Learning rate:",      optim_parameters["lr"])
-    print("Decay:",              optim_parameters["decay"])
-    print("*"*20)
-
-    # Specify here if you have one or several GPUs or CPUs,
-    # as well as number of epochs, batch size and validation size.
-    # If you do not want to use validation sets for early stopping, set valid_size to 0.
-    num_tower = 1  # Number of computing units
-    tower_type = "gpu"  # Type of computing units ("cpu" or "gpu")
-    batch_size = 128  # Batch size for each tower
-    num_epochs = optim_parameters["num_epoch"]  # Number of epochs
-    valid_size = 0.  # Size of validation set
-    # opt_mode = "adam"  # WARNING ! option not in use as of now
-    # withdiag = True  # use diagrams or not
-
-    # Specify here the decay of Exponential Moving Average, the learning rate of optimizer and the verbose for training.
-    decay = optim_parameters["decay"]  # Decay of Exponential Moving Average
-    learn_rate = optim_parameters["lr"]  # Learning rate of optimizer
-    verbose = True
-
-    # load precalculated feats and diagrams and labels
-    diag, feats, labels = load_diagfeatlabels(dataset, path_dataset=path_dataset, verbose=verbose)
-    diags, filts = preprocess(diag)
-
-    # Train and test data.
-    folds = ShuffleSplit(n_splits=num_folds, test_size=test_size).split(np.empty([feats.shape[0]]))
-
-    for idx, (train_sub, test_sub) in enumerate(folds):
-        valid_sub = train_sub[:int(valid_size * len(train_sub))]
-        train_sub = train_sub[int(valid_size * len(train_sub)):]
-
-        print(str(len(train_sub)) + " train points and " + str(len(test_sub)) + " test points")
-
-        # Create neural network
-        tf.reset_default_graph()
-
-        # Evaluation of neural network
-        ltrain, lvalid, ltest, weights = _evaluate_nn_model(labels, feats, diags, train_sub, valid_sub, test_sub,
-                                                            model, num_tower, tower_type, num_epochs,
-                                                            decay, learn_rate, batch_size, verbose)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(np.array(ltrain), color="blue", label="train acc")
-        ax.plot(np.array(ltest), color="red", label="test acc")
-        ax.set_ylim(top=100)
-        ax.legend()
-        ax.set_xlabel("epochs")
-        ax.set_ylabel("classif. accuracy")
-        ax.set_title("Evolution of train/test accuracy for " + dataset)
-        plt.show()
-
+    print("Optimizer:", "ADAM")
+    print("Number of epochs:", optim_parameters["num_epoch"])
+    print("Learning rate:", optim_parameters["lr"])
+    print("Decay:", optim_parameters["decay"])
+    print("*" * 20)
     return
 
 
@@ -620,51 +556,7 @@ def single_run(diags, feats, labels,
 
     perslay_parameters = model.get_parameters()
 
-    print("Filtrations used:")
-    print(list_filtrations)
-    print("Thresholding in diagrams:", thresh)
-
-    print(" ***** PersLay parameters: *****")
-    print("Layer:",                                  perslay_parameters["layer"])
-    layer = perslay_parameters["layer"]
-    if layer == "im":
-        print("  image size:",                         perslay_parameters["image_size"])
-        print("  image boundaries:",                   perslay_parameters["image_bnds"])
-        print("  convolution operations:",             perslay_parameters["cv_layers"])
-    elif layer == "pm":
-        print("  permutation equivariant operations:", perslay_parameters["peq"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "ls" or layer == "bc" or layer == "en":
-        print("  number of samples:",                  perslay_parameters["num_samples"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "ex":
-        print("  number of elements:",                 perslay_parameters["num_elements"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "rt":
-        print("  number of elements:",                 perslay_parameters["num_elements"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    elif layer == "rh":
-        print("  number of elements:",                 perslay_parameters["num_elements"])
-        print("  norm:",                               perslay_parameters["q"])
-        print("  fully-connected operations:",         perslay_parameters["fc_layers"])
-    
-    print("Weight function:",                          perslay_parameters["persistence_weight"])
-    weight = perslay_parameters["persistence_weight"]
-    if weight == "grid":
-        print("  grid size:",                          perslay_parameters["grid_size"])
-        print("  grid boundaries:" ,                   perslay_parameters["grid_bnds"])
-
-    print("Permutation invariant operation:",          perslay_parameters["perm_op"])
-    pop = perslay_parameters["perm_op"]
-    if pop == "topk":
-        print("  number of largest values",            perslay_parameters["keep"]) 
-
-    print("***** Optimization parameters *****")
-    print("Optimizer:",          "ADAM")
-    print("Number of epochs:",   optim_parameters["num_epoch"])
-    print("Learning rate:",      optim_parameters["lr"])
-    print("Decay:",              optim_parameters["decay"])
-    print("*"*20)
+    _print_info(list_filtrations, thresh, perslay_parameters, optim_parameters)
 
     # Specify here if you have one or several GPUs or CPUs,
     # as well as number of epochs, batch size and validation size.
@@ -751,15 +643,4 @@ def single_run(diags, feats, labels,
             
             return weights
 
-    return
-
-
-def perform_expe(dataset, model, path_dataset=""):
-    path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
-    filepath = path_dataset + dataset + ".conf"
-    dataset_type, list_filtrations, thresh, perslay_parameters, optim_parameters = load_config(filepath=filepath)
-    if dataset_type == "graph":
-        _run_expe(dataset, model, num_run=10)
-    elif dataset_type == "orbit":
-        _run_expe(dataset, model, num_run=100)
     return
