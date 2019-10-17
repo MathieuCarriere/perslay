@@ -26,12 +26,14 @@ import pandas as pd
 
 from six.moves import xrange
 
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.model_selection import KFold, ShuffleSplit
+from sklearn.preprocessing   import LabelEncoder, OneHotEncoder
+from sklearn.model_selection import KFold, ShuffleSplit, GridSearchCV
+from sklearn.pipeline        import Pipeline
+from sklearn.svm             import SVC
 
-from perslay.perslay import perslay_channel
+from perslay.perslay       import perslay_channel
 from perslay.preprocessing import preprocess
-from perslay.utils import diag_to_dict, hks_signature, get_base_simplex, apply_graph_extended_persistence
+from perslay.utils         import diag_to_dict, hks_signature, get_base_simplex, apply_graph_extended_persistence
 
 from tensorflow import random_uniform_initializer as rui
 
@@ -128,17 +130,18 @@ class baseModel:
                                     **self.perslay_parameters[i])
 
         # Concatenate all channels and add other features
-        vector = tf.concat(list_v, 1)
+        with tf.variable_scope("perslay"):
+            representations = tf.concat(list_v, 1)
         with tf.variable_scope("norm_feat"):
             feat = tf.layers.batch_normalization(feats)
 
-        vector = tf.concat([vector, feat], 1)
+        final_representations = tf.concat([representations, feat], 1)
 
         #  Final layer to make predictions
         with tf.variable_scope("final-dense"):
-            vector = tf.layers.dense(vector, self.num_labels)
+            logits = tf.layers.dense(final_representations, self.num_labels)
 
-        return vector
+        return representations, logits
 
 
 
@@ -387,7 +390,7 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
                             sp_diags[dt][i] for dt in range(num_filt)]
 
                         # Apply model
-                        tow_logit = model.instance(tow_indxs, tow_feats, tow_diags)
+                        representations, tow_logit = model.instance(tow_indxs, tow_feats, tow_diags)
 
                         # Compute train loss and accuracy on this tower
                         tow_acc = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(tow_logit, 1), tf.argmax(tow_label, 1)), dtype=tf.float32))
@@ -543,12 +546,13 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
             # Go back to train mode
             sess.run(switch_to_train_mode_op)
 
+            tr_repres = (representations.eval(feed_dict=feed_train), feed_train[label])
+            te_repres = (representations.eval(feed_dict=feed_test),  feed_test[label])
+
     if model.get_parameters()[0]["learn"] and type(perslay_parameters) == dict:    
         times = np.concatenate(times, axis=1)
-
-    return list_train_accs, list_test_accs, weights, times
-
-
+    
+    return list_train_accs, list_test_accs, weights, times, [tr_repres, te_repres]
 
 
 
@@ -568,9 +572,11 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
 
 
 
-def perform_expe(num_run=1, path_dataset=None, dataset="custom",
+
+
+def perform_expe(num_runs=1, path_dataset=None, dataset="custom",
     model=None, diags=[np.empty([0,0,0])], feats=np.empty([0,0]), labels=np.empty([0,0]),
-    optim_parameters={}, cross_valid=None, verbose=True):
+    optim_parameters={}, perslay_cv=10, standard_model=False, standard_parameters=[], standard_cv=10, verbose=True):
     
     if path_dataset is not None:
 
@@ -594,18 +600,18 @@ def perform_expe(num_run=1, path_dataset=None, dataset="custom",
     mode, num_folds, num_epochs = optim_parameters["mode"], optim_parameters["folds"], optim_parameters["num_epochs"]
 
     # Train and test data.
-    train_accs_res = np.zeros([num_run, num_folds, num_epochs])
-    test_accs_res = np.zeros([num_run, num_folds, num_epochs])
+    train_accs_res = np.zeros([num_runs, num_folds, num_epochs]) if not standard_model else np.zeros([num_runs, num_folds, num_epochs+1])
+    test_accs_res = np.zeros([num_runs, num_folds, num_epochs]) if not standard_model else np.zeros([num_runs, num_folds, num_epochs+1])
 
-    for idx_score in range(num_run):
+    for idx_score in range(num_runs):
+
         print("Run number %i" % (idx_score+1))
         print("*************")
         if mode == "KF":  # Evaluation with k-fold on test set
             folds = KFold(n_splits=num_folds, random_state=idx_score, shuffle=True).split(np.empty([feats.shape[0]]))
         if mode == "RP":  # Evaluation with random test set
             test_size = optim_parameters["test_size"]
-            folds = ShuffleSplit(n_splits=num_folds, test_size=test_size, random_state=idx_score).split(
-                np.empty([feats.shape[0]]))
+            folds = ShuffleSplit(n_splits=num_folds, test_size=test_size, random_state=idx_score).split(np.empty([feats.shape[0]]))
 
         for idx, (train_sub, test_sub) in enumerate(folds):
 
@@ -616,22 +622,30 @@ def perform_expe(num_run=1, path_dataset=None, dataset="custom",
             if type(model) is not list and type(optim_parameters) is not list:
                 best_model, best_optim = model, optim_parameters
             else:
-                if cross_valid is None:
-                    cross_valid = 10
                 list_model = model if type(model) == list else [model]
                 list_optim = optim_parameters if type(optim_parameters) == list else [optim_parameters]
                 best_model, best_avg, best_optim = list_model[0], 0., list_optim[0]
                 for mdl in list_model:
                     for opt in list_optim:
                         avg_acc = 0.
-                        folds = KFold(n_splits=cross_valid, random_state=idx_score+1, shuffle=True).split(np.empty([len(train_sub)]))
-                        for idx, (train_param, valid_param) in enumerate(folds):
-                            _, te, _, _ = _evaluate_nn_model(labels, feats, diags, train_sub[train_param], train_sub[valid_param], mdl, opt, verbose=False)
-                            avg_acc += te[-1] / cross_valid
+                        folds_inner = KFold(n_splits=perslay_cv, random_state=idx+1, shuffle=True).split(np.empty([len(train_sub)]))
+                        for _, (train_param, valid_param) in enumerate(folds_inner):
+                            _, te, _, _, _ = _evaluate_nn_model(labels, feats, diags, train_sub[train_param], train_sub[valid_param], mdl, opt, verbose=False)
+                            avg_acc += te[-1] / perslay_cv
                         if avg_acc > best_avg:
                             best_model, best_avg, best_optim = mdl, avg_acc, opt
 
-            ltrain, ltest, _, _ = _evaluate_nn_model(labels, feats, diags, train_sub, test_sub, best_model, best_optim, verbose)
+            ltrain, ltest, _, _, vecs = _evaluate_nn_model(labels, feats, diags, train_sub, test_sub, best_model, best_optim, verbose)
+            
+            if standard_model:
+                tr_vectors, te_vectors = vecs[0][0], vecs[1][0]
+                tr_labels,  te_labels  = np.array([np.where(vecs[0][1][i,:]==1)[0][0] for i in range(len(tr_vectors))]), np.array([np.where(vecs[1][1][i,:]==1)[0][0] for i in range(len(te_vectors))])
+                pipe  = Pipeline([("Estimator", SVC())])
+                std_model = GridSearchCV(pipe, standard_parameters, cv=standard_cv)
+                std_model = std_model.fit(tr_vectors, tr_labels)
+                ltrain.append(100 * std_model.score(tr_vectors, tr_labels))
+                ltest.append(100 * std_model.score(te_vectors, te_labels))
+
             train_accs_res[idx_score, idx, :] = np.array(ltrain)
             test_accs_res[idx_score, idx, :] = np.array(ltest)
 
@@ -643,12 +657,14 @@ def perform_expe(num_run=1, path_dataset=None, dataset="custom",
     with open(output + "summary.txt", "w") as text_file:
         text_file.write("DATASET: " + dataset + "\n")
         text_file.write(str(datetime.datetime.now()) + "\n\n")        
-        text_file.write("****** " + str(num_run) + " RUNS SUMMARY ******\n")
+        text_file.write("****** " + str(num_runs) + " RUNS SUMMARY ******\n")
         text_file.write("Mode: " + mode + ", number of folds: " + str(num_folds) + "\n")
         text_file.write("Filtrations parameters: " + str(filt_print) + "\n")
         text_file.write("PersLay parameters: " + str(pers_print) + "\n")
         text_file.write("Linear combinations: " + str(comb_print) + "\n")
         text_file.write("Optimization parameters: " + str(optim_parameters) + "\n")
+        if standard_model:
+            text_file.write("Standard classifiers: " + str(standard_parameters) + "\n")
 
         folders_means = np.mean(test_accs_res, axis=1)
         overall_best_epoch = np.argmax(np.mean(folders_means, axis=0))
@@ -660,6 +676,9 @@ def perform_expe(num_run=1, path_dataset=None, dataset="custom",
 
         print("Mean: " + str(np.round(np.mean(final_means), 2)) + "% +/- " + str(np.round(np.std(final_means), 2)) + "%")
         print("Best mean: " + str(np.round(np.mean(best_means), 2)) + "% +/- " + str(np.round(np.std(best_means), 2)) + "%, reached at epoch " + str(overall_best_epoch + 1))
+
+    np.save(output + "train_accs.npy", train_accs_res)
+    np.save(output + "test_accs.npy", train_accs_res)
 
     return
 
@@ -686,7 +705,8 @@ def perform_expe(num_run=1, path_dataset=None, dataset="custom",
 def single_run(test_size, path_dataset=None, dataset="custom",
                model=None, diags=[np.empty([0,0,0])], feats=np.empty([0,0]), labels=np.empty([0,0]),
                optim_parameters={},
-               cross_valid=None, visualize_weights_times=False, verbose=True,
+               perslay_cv=None, standard_model=False, standard_parameters=[], standard_cv=10, 
+               visualize_weights_times=False, verbose=True,
                **kwargs):
 
     if path_dataset is not None:
@@ -715,6 +735,8 @@ def single_run(test_size, path_dataset=None, dataset="custom",
     print("PersLay parameters:", pers_print)
     print("Linear combinations:", comb_print)
     print("Optimization parameters:", optim_parameters)
+    if standard_model:
+        print("Standard classifiers:", standard_parameters)
 
     # Train and test data.
     folds = ShuffleSplit(n_splits=1, test_size=test_size).split(np.empty([feats.shape[0]]))
@@ -727,22 +749,37 @@ def single_run(test_size, path_dataset=None, dataset="custom",
         if type(model) is not list and type(optim_parameters) is not list:
             best_model, best_optim = model, optim_parameters
         else:
-            if cross_valid is None:
-                cross_valid = 10
             list_model = model if type(model) == list else [model]
             list_optim = optim_parameters if type(optim_parameters) == list else [optim_parameters]
             best_model, best_avg, best_optim = list_model[0], 0., list_optim[0]
             for mdl in list_model:
                 for opt in list_optim:
                     avg_acc = 0.
-                    folds = KFold(n_splits=cross_valid, random_state=42, shuffle=True).split(np.empty([len(train_sub)]))
-                    for idx, (train_param, valid_param) in enumerate(folds):
-                        _, te, _, _ = _evaluate_nn_model(labels, feats, diags, train_sub[train_param], train_sub[valid_param], mdl, opt, verbose=False)
-                        avg_acc += te[-1] / cross_valid
+                    folds_inner = KFold(n_splits=perslay_cv, random_state=42, shuffle=True).split(np.empty([len(train_sub)]))
+                    for _, (train_param, valid_param) in enumerate(folds_inner):
+                        _, te, _, _, _ = _evaluate_nn_model(labels, feats, diags, train_sub[train_param], train_sub[valid_param], mdl, opt, verbose=False)
+                        avg_acc += te[-1] / perslay_cv
                     if avg_acc > best_avg:
                         best_model, best_avg, best_optim = mdl, avg_acc, opt
 
-        ltrain, ltest, weights, times = _evaluate_nn_model(labels, feats, diags, train_sub, test_sub, best_model, best_optim, verbose=True)
+        if type(model) is list:
+            print("Best model:", best_model)
+        if type(optim_parameters) is list:
+            print("Best optim:", best_optim)
+
+        ltrain, ltest, weights, times, vecs = _evaluate_nn_model(labels, feats, diags, train_sub, test_sub, best_model, best_optim, verbose=True)
+        if standard_model:
+            tr_vectors, te_vectors = vecs[0][0], vecs[1][0]
+            tr_labels,  te_labels  = np.array([np.where(vecs[0][1][i,:]==1)[0][0] for i in range(len(tr_vectors))]), np.array([np.where(vecs[1][1][i,:]==1)[0][0] for i in range(len(te_vectors))])
+            pipe  = Pipeline([("Estimator", SVC())])
+            model = GridSearchCV(pipe, standard_parameters, cv=standard_cv)
+            model = model.fit(tr_vectors, tr_labels)
+            print("Best standard classifier:", model.best_params_)
+            tracc, teacc = 100 * model.score(tr_vectors, tr_labels), 100 * model.score(te_vectors, te_labels)
+            ltrain.append(tracc)
+            ltest.append(teacc)
+            print("train acc: " + str(tracc) + ", test acc: " + str(teacc))
+            
 
         fig = plt.figure()
         ax = fig.add_subplot(111)

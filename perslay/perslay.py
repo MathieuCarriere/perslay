@@ -101,12 +101,12 @@ def image_layer(inp, image_size, image_bnds, variance_init, variance_const):
     """ Persistence Image PersLay """
     bp_inp = tf.einsum("ijk,kl->ijl", inp, tf.constant(np.array([[1.,-1.],[0.,1.]], dtype=np.float32)))
     dimension_before, num_pts = inp.shape[2].value, inp.shape[1].value
-    coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / (image_size[i]-1)) for i in range(dimension_before)]
+    coords = [tf.range(start=image_bnds[i][0], limit=image_bnds[i][1], delta=(image_bnds[i][1] - image_bnds[i][0]) / image_size[i]) for i in range(dimension_before)]
     M = tf.meshgrid(*coords)
     mu = tf.concat([tf.expand_dims(tens, 0) for tens in M], axis=0)
-    sg = tf.get_variable("s", shape=[1, 1, 1] + [1 for _ in range(dimension_before)], initializer=variance_init) if not variance_const else tf.get_variable("s", initializer=variance_init)
+    sg = tf.get_variable("s", shape=[1], initializer=variance_init) if not variance_const else tf.get_variable("s", initializer=variance_init)
     bc_inp = tf.reshape(bp_inp, [-1, num_pts, dimension_before] + [1 for _ in range(dimension_before)])
-    return tf.exp(tf.reduce_sum(-tf.multiply(tf.square(bc_inp - mu), tf.square(sg)), axis=2))
+    return tf.exp(tf.reduce_sum(  -tf.square(bc_inp-mu) / (2*tf.square(sg[0])),  axis=2)) / (2*np.pi*tf.square(sg[0]))
 
 
 def perslay_channel(output, name, diag, **kwargs):
