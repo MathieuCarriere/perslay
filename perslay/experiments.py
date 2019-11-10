@@ -276,10 +276,10 @@ def generate_diag_and_features(dataset, path_dataset=""):
 
 
 # notebook utils
-def load_diagfeatlabels(dataset, path_dataset="", verbose=False):
+def load_diagfeatlabels(dataset, path_dataset="", filtrations=[], verbose=False):
     path_dataset = "./data/" + dataset + "/" if not len(path_dataset) else path_dataset
     diagfile = h5py.File(path_dataset + dataset + ".hdf5", "r")
-    filts = list(diagfile.keys())
+    filts = list(diagfile.keys()) if len(filtrations) == 0 else filtrations
     feat = pd.read_csv(path_dataset + dataset + ".csv", index_col=0, header=0)
     diag = diag_to_dict(diagfile, filts=filts)
 
@@ -298,27 +298,75 @@ def load_diagfeatlabels(dataset, path_dataset="", verbose=False):
 
 
 # learning utils
-def _create_batches(indices, feed_dict, num_tower, tower_size, random=False):
-    batch_size = num_tower * tower_size
-    data_num_pts = len(indices)
-    residual = data_num_pts % batch_size
-    nbsplit = int((data_num_pts - residual) / batch_size)
-    split = np.split(np.arange(data_num_pts - residual), nbsplit) if nbsplit > 0 else []
-    # number_of_batches = nbsplit + min(residual, 1)
-    if random:
-        perm = np.random.permutation(data_num_pts)
+def _create_batches(indices, feed_dict, num_tower, tower_size, random=False, balanced=True, labels=np.empty([0,0])):
     batches = []
-    for i in range(nbsplit):
-        feed_sub = dict()
-        for k in feed_dict.keys():
-            feed_sub[k] = feed_dict[k][perm[split[i]]] if random else feed_dict[k][split[i]]
-        batches.append(feed_sub)
-    if residual > 0:
-        st, sz = data_num_pts - residual, residual - (residual % num_tower)
-        feed_sub = dict()
-        for k in feed_dict.keys():
-            feed_sub[k] = feed_dict[k][perm[np.arange(st, st + sz)]] if random else feed_dict[k][np.arange(st, st + sz)]
-        batches.append(feed_sub)
+    
+    if balanced:
+
+        num_labs = labels.shape[1]
+        tower_size = tower_size - (tower_size % num_labs)
+        batch_size = num_tower * tower_size
+        I = []
+        for l in range(num_labs):
+            I.append(np.argwhere(labels[:,l]==1)[:,0])
+        pts_per_lab = min([len(idxs) for idxs in I])
+        data_num_pts = num_labs * pts_per_lab
+        batch_size_lab = int(batch_size / num_labs)
+        residual = pts_per_lab % batch_size_lab
+        nbsplit = int((pts_per_lab - residual) / batch_size_lab)
+        split = np.split(np.arange(pts_per_lab - residual), nbsplit) if nbsplit > 0 else []
+
+        if random:
+            for l in range(num_labs):
+                np.random.shuffle(I[l])
+
+        for i in range(nbsplit):
+            feed_sub = dict()
+            for k in feed_dict.keys():
+                FS = []
+                for l in range(num_labs):
+                    FS.append(feed_dict[k][I[l][split[i]]])
+                FS = np.vstack(FS)
+                np.random.shuffle(FS)
+                feed_sub[k] = FS
+            batches.append(feed_sub)
+
+        if residual > 0:
+            st, sz = pts_per_lab - residual, residual - (residual % num_tower)
+            feed_sub = dict()
+            for k in feed_dict.keys():
+                FS = []
+                for l in range(num_labs):
+                    FS.append(feed_dict[k][I[l][np.arange(st, st + sz)]])
+                FS = np.vstack(FS)
+                np.random.shuffle(FS)
+                feed_sub[k] = FS
+            batches.append(feed_sub)
+        
+    else:
+
+        batch_size = num_tower * tower_size
+        data_num_pts = len(indices)
+        residual = data_num_pts % batch_size
+        nbsplit = int((data_num_pts - residual) / batch_size)
+        split = np.split(np.arange(data_num_pts - residual), nbsplit) if nbsplit > 0 else []
+
+        if random:
+            perm = np.random.permutation(data_num_pts)    
+
+        for i in range(nbsplit):
+            feed_sub = dict()
+            for k in feed_dict.keys():
+                feed_sub[k] = feed_dict[k][perm[split[i]]] if random else feed_dict[k][split[i]]
+            batches.append(feed_sub)
+
+        if residual > 0:
+            st, sz = data_num_pts - residual, residual - (residual % num_tower)
+            feed_sub = dict()
+            for k in feed_dict.keys():
+                feed_sub[k] = feed_dict[k][perm[np.arange(st, st + sz)]] if random else feed_dict[k][np.arange(st, st + sz)]
+            batches.append(feed_sub)
+
     return batches
 
 
@@ -474,7 +522,8 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
         feed_train[diags[dt]], feed_test[diags[dt]] = DG[dt][train_sub, :], DG[dt][test_sub, :]
 
     # Create test batches
-    test_batches = _create_batches(test_sub, feed_test, num_tower, tower_size, False)
+    train_batches_eval = _create_batches(train_sub, feed_train, num_tower, tower_size, False, False)
+    test_batches = _create_batches(test_sub, feed_test, num_tower, tower_size, False, False)
 
     # Build an initialization operation to run below
     init = tf.global_variables_initializer()
@@ -507,7 +556,7 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
         for epoch in xrange(num_epochs):
 
             # Create random train batches
-            train_batches = _create_batches(train_sub, feed_train, num_tower, tower_size, True)
+            train_batches = _create_batches(train_sub, feed_train, num_tower, tower_size, True, True, LB[train_sub, :])
 
             # Apply gradient descent
             for feed_batch in train_batches:
@@ -534,7 +583,7 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
             # Switch to test mode and evaluate train and test accuracy
             sess.run(switch_to_test_mode_op)
             train_acc, test_acc = 0, 0
-            for feed_batch in train_batches:
+            for feed_batch in train_batches_eval:
                 train_acc += 100 * accuracy.eval(feed_dict=feed_batch) * (feed_batch[label].shape[0] / train_num_pts)
             for feed_batch in test_batches:
                 test_acc += 100 * accuracy.eval(feed_dict=feed_batch) * (feed_batch[label].shape[0] / test_num_pts)
