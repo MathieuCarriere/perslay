@@ -650,8 +650,10 @@ def perform_expe(num_runs=1, path_dataset=None, dataset="custom",
                 for idx, pe in enumerate(list_pers):
                     model.append(baseModel(fi, pe, labels, combination=combs[idx]))
 
-    mode, num_folds, num_epochs = optim_parameters["mode"], optim_parameters["folds"], optim_parameters["num_epochs"]
-
+    if type(optim_parameters) is not list:
+        mode, num_folds, num_epochs = optim_parameters["mode"], optim_parameters["folds"], optim_parameters["num_epochs"]
+    else:
+        mode, num_folds, num_epochs = optim_parameters[0]["mode"], optim_parameters[0]["folds"], optim_parameters[0]["num_epochs"]
     # Train and test data.
     train_accs_res = np.zeros([num_runs, num_folds, num_epochs]) if not standard_model else np.zeros([num_runs, num_folds, num_epochs+1])
     test_accs_res = np.zeros([num_runs, num_folds, num_epochs]) if not standard_model else np.zeros([num_runs, num_folds, num_epochs+1])
@@ -663,7 +665,7 @@ def perform_expe(num_runs=1, path_dataset=None, dataset="custom",
         if mode == "KF":  # Evaluation with k-fold on test set
             folds = KFold(n_splits=num_folds, random_state=idx_score, shuffle=True).split(np.empty([feats.shape[0]]))
         if mode == "RP":  # Evaluation with random test set
-            test_size = optim_parameters["test_size"]
+            test_size = optim_parameters["test_size"] if type(optim_parameters) is not list else optim_parameters[0]["test_size"]
             folds = ShuffleSplit(n_splits=num_folds, test_size=test_size, random_state=idx_score).split(np.empty([feats.shape[0]]))
 
         for idx, (train_sub, test_sub) in enumerate(folds):
