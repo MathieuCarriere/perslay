@@ -125,6 +125,12 @@ def perslay_channel(output, name, diag, **kwargs):
             C = tf.get_variable("C", shape=[1], initializer=kwargs["coeff_init"]) if not kwargs["coeff_const"] else tf.get_variable("C", initializer=kwargs["coeff_init"])
             weight = C * tf.abs(tensor_diag[:, :, 1:2]-tensor_diag[:, :, 0:1])
 
+    if kwargs["persistence_weight"] == "power":
+        with tf.variable_scope(name + "-power_pweight"):
+            p = kwargs["power_p"]
+            C = tf.get_variable("C", shape=[1], initializer=kwargs["coeff_init"]) if not kwargs["coeff_const"] else tf.get_variable("C", initializer=kwargs["coeff_init"])
+            weight = C * tf.pow(tf.abs(tensor_diag[:, :, 1:2]-tensor_diag[:, :, 0:1]), p)
+
     if kwargs["persistence_weight"] == "grid":
         with tf.variable_scope(name + "-grid_pweight"):
             W = tf.get_variable("W", shape=kwargs["grid_size"], initializer=kwargs["grid_init"]) if not kwargs["grid_const"] else tf.get_variable("W", initializer=kwargs["grid_init"])
