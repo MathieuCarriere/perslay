@@ -171,6 +171,7 @@ def load_config(filepath):
         perslay_parameters = literal_eval(lines[2])
         combs = literal_eval(lines[3])
         optim_parameters = literal_eval(lines[4])
+        optim_parameters["balanced"] = False
         for k in perslay_parameters.keys():
             if k[-4:] == "init":
                 a, b = perslay_parameters[k][0], perslay_parameters[k][1]
@@ -391,7 +392,7 @@ def _create_batches(indices, feed_dict, num_tower, tower_size, random=False, bal
 
 def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters, verbose=True):
 
-    num_tower, tower_type, num_epochs, decay, learning_rate, tower_size, optimizer = optim_parameters["num_tower"], optim_parameters["tower_type"], optim_parameters["num_epochs"], optim_parameters["decay"], optim_parameters["learning_rate"], optim_parameters["tower_size"], optim_parameters["optimizer"]
+    num_tower, tower_type, num_epochs, decay, learning_rate, tower_size, optimizer, balanced = optim_parameters["num_tower"], optim_parameters["tower_type"], optim_parameters["num_epochs"], optim_parameters["decay"], optim_parameters["learning_rate"], optim_parameters["tower_size"], optim_parameters["optimizer"], optim_parameters["balanced"]
 
     tf.reset_default_graph()
 
@@ -556,7 +557,10 @@ def _evaluate_nn_model(LB, FT, DG, train_sub, test_sub, model, optim_parameters,
         for epoch in xrange(num_epochs):
 
             # Create random train batches
-            train_batches = _create_batches(train_sub, feed_train, num_tower, tower_size, True, True, LB[train_sub, :])
+            if balanced:
+                train_batches = _create_batches(train_sub, feed_train, num_tower, tower_size, True, True, LB[train_sub, :])
+            else:
+                train_batches = _create_batches(train_sub, feed_train, num_tower, tower_size, True, False, LB[train_sub, :])
 
             # Apply gradient descent
             for feed_batch in train_batches:
