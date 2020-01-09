@@ -99,7 +99,7 @@ The python function `perslay` takes four arguments:
 
   * the fourth argument is a python dictionary containing the parameters of PersLay. Examples can be found in `tutorialPersLay.ipynb`.
  
-In the following description of PersLay parameters, each parameter, or dictionary key, that contains "_init" in its name is optimized and learned by PersLay during training.
+In the following description of PersLay parameters, each parameter, or dictionary key, that contains "_init" in its name is optimized and learned by PersLay during training. If you do not want to optimize the vectorization, set the (optional) keys **train_vect** and **train_weight** to False.
 
   * The following keys are mandatory:
 
@@ -237,6 +237,6 @@ Depending on what **layer** is, the following additional keys are requested:
 
 If you use this code or refer to it, please cite
 
-[1] _PersLay: A Simple and Versatile Neural Network Layer for Persistence Diagrams._
+[1] _PersLay: A Neural Network Layer for Persistence Diagrams and New Graph Topological Signatures._
 Mathieu Carrière, Frederic Chazal, Yuichi Ike, Théo Lacombe, Martin Royer, Yuhei Umeda.
 https://arxiv.org/abs/1904.09378.
