@@ -9,7 +9,7 @@ def permutation_equivariant_layer(inp, dimension, perm_op, lbda, b, gamma):
     dimension_before, num_pts = inp.shape[2], inp.shape[1]
     b = tf.expand_dims(tf.expand_dims(b, 0), 0)
     A = tf.reshape(tf.einsum("ijk,kl->ijl", inp, lbda), [-1, num_pts, dimension])
-    if perm_op is not None:
+    if perm_op != None:
         if perm_op == "max":
             beta = tf.tile(tf.expand_dims(tf.math.reduce_max(inp, axis=1), 1), [1, num_pts, 1])
         elif perm_op == "min":
@@ -91,7 +91,7 @@ class PerslayModel(tf.keras.Model):
         for nf, plp in enumerate(self.perslay_parameters):
 
             weight = plp["pweight"]
-            if weight is not None:
+            if weight != None:
                 Winit, Wtrain, Wname = plp["pweight_init"], plp["pweight_train"], self.namemodel + "-pweight-" + str(nf)
                 if not callable(Winit):
                     W = tf.Variable(name=Wname, initial_value=Winit, trainable=Wtrain)
@@ -119,7 +119,7 @@ class PerslayModel(tf.keras.Model):
                     LBiv = LBinit([dim]) if callable(LBinit) else LBinit
                     LW.append(      tf.Variable(name=Lname+"-W", initial_value=LWiv, trainable=Ltrain))
                     LB.append(      tf.Variable(name=Lname+"-B", initial_value=LBiv, trainable=Ltrain))
-                    if pop is not None:
+                    if pop != None:
                         LGiv = LGinit([dim_before, dim]) if callable(LGinit) else LGinit
                         LG.append(  tf.Variable(name=Lname+"-G", initial_value=LGiv, trainable=Ltrain))
                     else:
@@ -219,7 +219,7 @@ class PerslayModel(tf.keras.Model):
 
             # Apply weight
             output_dim = len(tensor_diag.shape) - 2
-            if plp["pweight"] is not None:
+            if plp["pweight"] != None:
                 for _ in range(output_dim-1):
                     weight = tf.expand_dims(weight, -1)
                 tiled_weight = tf.tile(weight, [1, 1] + tensor_diag.shape[2:])
@@ -244,7 +244,7 @@ class PerslayModel(tf.keras.Model):
                 vector = tf.math.reduce_mean(masked_layer, axis=1)
 
             # Second layer of channel
-            vector = plp["final_model"].call(vector, training=training) if plp["final_model"] is not "identity" else vector
+            vector = plp["final_model"].call(vector, training=training) if plp["final_model"] != "identity" else vector
             list_v.append(vector)
 
         # Concatenate all channels and add other features
@@ -256,6 +256,6 @@ class PerslayModel(tf.keras.Model):
         diags, feats = inputs[0], inputs[1]
         representations = self.compute_representations(diags, training)
         concat_representations = tf.concat(values=[representations, feats], axis=1)
-        final_representations = self.rho(concat_representations) if self.rho is not "identity" else concat_representations
+        final_representations = self.rho(concat_representations) if self.rho != "identity" else concat_representations
 
         return final_representations
