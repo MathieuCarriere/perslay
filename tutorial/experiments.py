@@ -25,7 +25,7 @@ def get_parameters(dataset):
         dataset_parameters = {"data_type": "orbit", "filt_names": ["Alpha0", "Alpha1"]}
     return dataset_parameters
 
-def get_model(dataset):
+def get_model(dataset, nf):
 
     if dataset == "MUTAG":
 
@@ -48,7 +48,7 @@ def get_model(dataset):
             for i in range(4):
                 fmodel = tf.keras.Sequential([tf.keras.layers.Conv2D(10, 2, input_shape=(21,21,1)), tf.keras.layers.Flatten()])
                 perslay_parameters[i]["final_model"] = fmodel
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(16039,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(16000+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=0.5, staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
@@ -77,7 +77,7 @@ def get_model(dataset):
             for i in range(4):
                 fmodel = tf.keras.Sequential([tf.keras.layers.Conv2D(10, 2, input_shape=(16,16,1)), tf.keras.layers.Flatten()])
                 perslay_parameters[i]["final_model"] = fmodel
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(9039,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(9000+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=0.5, staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
@@ -102,7 +102,7 @@ def get_model(dataset):
 
         mirrored_strategy = tf.distribute.MirroredStrategy()
         with mirrored_strategy.scope():
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(239,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(200+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=0.5, staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
@@ -132,7 +132,7 @@ def get_model(dataset):
             for i in range(8):
                 fmodel = tf.keras.Sequential([tf.keras.layers.Conv2D(10, 2, input_shape=(21,21,1)), tf.keras.layers.Flatten()])
                 perslay_parameters[i]["final_model"] = fmodel
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(nlab, activation="sigmoid", input_shape=(32039,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(nlab, activation="sigmoid", input_shape=(32000+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=0.5, staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
@@ -161,7 +161,7 @@ def get_model(dataset):
             for i in range(8):
                 fmodel = tf.keras.Sequential([tf.keras.layers.Conv2D(10, 2, input_shape=(21,21,1)), tf.keras.layers.Flatten()])
                 perslay_parameters[i]["final_model"] = fmodel
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(32039,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(32000+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=0.5, staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
@@ -190,7 +190,7 @@ def get_model(dataset):
 
         mirrored_strategy = tf.distribute.MirroredStrategy()
         with mirrored_strategy.scope():
-            rho = tf.keras.Sequential([tf.keras.layers.Dense(5, activation="sigmoid", input_shape=(250,))])
+            rho = tf.keras.Sequential([tf.keras.layers.Dense(5, activation="sigmoid", input_shape=(250+nf,))])
             model = PerslayModel(name="PersLay", diagdim=2, perslay_parameters=perslay_parameters, rho=rho)
             lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.01, decay_steps=20, decay_rate=1., staircase=True)
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr, epsilon=1e-4)
