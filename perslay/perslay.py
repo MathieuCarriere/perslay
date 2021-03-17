@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow_addons as tfa
 from tensorflow import random_uniform_initializer as rui
 import numpy as np
 
