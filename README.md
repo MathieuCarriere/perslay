@@ -1,4 +1,4 @@
-**WARNING: this is legacy code, which is no longer maintained!! The PersLay model of this repo is now improved and part of the GUDHI library (https://gudhi.inria.fr/python/latest/).**
+**WARNING: this is legacy code, which is no longer maintained!! The PersLay model of this repo is now improved and part of the GUDHI library (https://gudhi.inria.fr/python/latest/representations_tflow_itf_ref.html).**
 
 # PersLay: a neural network layer for persistence diagrams and new graph topological signatures
 
