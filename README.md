@@ -1,3 +1,5 @@
+**WARNING: this is legacy code, which is no longer maintained!! The PersLay model of this repo is now improved and part of the GUDHI library (https://gudhi.inria.fr/python/latest/).**
+
 # PersLay: a neural network layer for persistence diagrams and new graph topological signatures
 
 __Authors:__  Mathieu Carriere, Theo Lacombe, Martin Royer
